@@ -18,7 +18,7 @@
 // Supabase 설정
 const SUPABASE_URL = 'https://sniabexwdgeepakkxxek.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuaWFiZXh3ZGdlZXBha2t4eGVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MDMxNzIsImV4cCI6MjA4NTA3OTE3Mn0.RsDQDyawjFk5voFLVouXDlTIXvhPrsziCD37ne-1jMU';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // 상태
 let page = 'login';
@@ -119,11 +119,11 @@ async function doRegister(){
   loading=true;render();
   
   // 학원 생성
-  const {data:academyData,error:err1} = await supabase.from('academies').insert({name,owner,phone,address}).select().single();
+  const {data:academyData,error:err1} = await db.from('academies').insert({name,owner,phone,address}).select().single();
   if(err1){alert('학원 등록 실패: '+err1.message);loading=false;render();return;}
   
   // 관리자 생성
-  const {data:adminData,error:err2} = await supabase.from('admins').insert({academy_id:academyData.id,email,password:pw}).select().single();
+  const {data:adminData,error:err2} = await db.from('admins').insert({academy_id:academyData.id,email,password:pw}).select().single();
   if(err2){alert('관리자 등록 실패: '+err2.message);loading=false;render();return;}
   
   alert('가입 완료! 로그인하세요.');
@@ -141,7 +141,7 @@ async function doLogin(){
   
   loading=true;render();
   
-  const {data,error} = await supabase.from('admins').select('*,academies(*)').eq('email',email).eq('password',pw).single();
+  const {data,error} = await db.from('admins').select('*,academies(*)').eq('email',email).eq('password',pw).single();
   
   if(error||!data){alert('로그인 실패: 이메일 또는 비밀번호 확인');loading=false;render();return;}
   
@@ -158,20 +158,20 @@ async function doLogin(){
 
 // 데이터 로드
 async function loadData(){
-  const {data:s} = await supabase.from('students').select('*').eq('academy_id',academy.id);
+  const {data:s} = await db.from('students').select('*').eq('academy_id',academy.id);
   students = s || [];
   
-  const {data:n} = await supabase.from('notices').select('*').eq('academy_id',academy.id).order('created_at',{ascending:false});
+  const {data:n} = await db.from('notices').select('*').eq('academy_id',academy.id).order('created_at',{ascending:false});
   notices = n || [];
   
-  const {data:c} = await supabase.from('consults').select('*,students(name)').eq('students.academy_id',academy.id);
+  const {data:c} = await db.from('consults').select('*,students(name)').eq('students.academy_id',academy.id);
   consults = c || [];
   
-  const {data:t} = await supabase.from('todos').select('*').eq('academy_id',academy.id);
+  const {data:t} = await db.from('todos').select('*').eq('academy_id',academy.id);
   todos = t || [];
   
   // 오늘 출석
-  const {data:a} = await supabase.from('attendance').select('*').eq('date',todayISO);
+  const {data:a} = await db.from('attendance').select('*').eq('date',todayISO);
   attendance = {};
   (a||[]).forEach(att=>{attendance[att.student_id]=att.status;});
 }
@@ -548,9 +548,9 @@ async function saveStudent(){
   loading=true;render();
   
   if(editingId){
-    await supabase.from('students').update(data).eq('id',editingId);
+    await db.from('students').update(data).eq('id',editingId);
   } else {
-    await supabase.from('students').insert(data);
+    await db.from('students').insert(data);
   }
   
   await loadData();
@@ -569,10 +569,10 @@ function viewStudent(id){
 async function toggleAtt(id){
   const exists = attendance[id];
   if(exists){
-    await supabase.from('attendance').delete().eq('student_id',id).eq('date',todayISO);
+    await db.from('attendance').delete().eq('student_id',id).eq('date',todayISO);
     delete attendance[id];
   } else {
-    await supabase.from('attendance').insert({student_id:id,date:todayISO,status:'출석'});
+    await db.from('attendance').insert({student_id:id,date:todayISO,status:'출석'});
     attendance[id]='출석';
   }
   render();
@@ -581,7 +581,7 @@ async function toggleAtt(id){
 function toggleSelect(id){selectedStudents[id]=!selectedStudents[id];render();}
 
 async function markPaid(id){
-  await supabase.from('students').update({paid:true,paid_date:todayISO}).eq('id',id);
+  await db.from('students').update({paid:true,paid_date:todayISO}).eq('id',id);
   await loadData();
   render();
 }
@@ -589,7 +589,7 @@ async function markPaid(id){
 async function addTodo(){
   const text=prompt('할 일:');
   if(!text)return;
-  await supabase.from('todos').insert({academy_id:academy.id,text});
+  await db.from('todos').insert({academy_id:academy.id,text});
   await loadData();
   render();
 }
@@ -597,14 +597,14 @@ async function addTodo(){
 async function toggleTodo(id){
   const t=todos.find(x=>x.id===id);
   if(t){
-    await supabase.from('todos').update({done:!t.done}).eq('id',id);
+    await db.from('todos').update({done:!t.done}).eq('id',id);
     await loadData();
     render();
   }
 }
 
 async function deleteTodo(id){
-  await supabase.from('todos').delete().eq('id',id);
+  await db.from('todos').delete().eq('id',id);
   await loadData();
   render();
 }
@@ -613,14 +613,14 @@ async function addNotice(){
   const title=prompt('공지 제목:');
   if(!title)return;
   const content=prompt('내용:')||'';
-  await supabase.from('notices').insert({academy_id:academy.id,title,content});
+  await db.from('notices').insert({academy_id:academy.id,title,content});
   await loadData();
   render();
 }
 
 async function deleteNotice(id){
   if(confirm('삭제?')){
-    await supabase.from('notices').delete().eq('id',id);
+    await db.from('notices').delete().eq('id',id);
     await loadData();
     render();
   }
@@ -629,7 +629,7 @@ async function deleteNotice(id){
 async function sendReply(id){
   const el=document.getElementById('reply'+id);
   if(!el||!el.value)return;
-  await supabase.from('consults').update({reply:el.value,status:'완료'}).eq('id',id);
+  await db.from('consults').update({reply:el.value,status:'완료'}).eq('id',id);
   await loadData();
   render();
 }
@@ -653,7 +653,7 @@ async function saveSettings(){
     address: document.getElementById('setAddress').value,
     phone: document.getElementById('setPhone').value
   };
-  await supabase.from('academies').update(data).eq('id',academy.id);
+  await db.from('academies').update(data).eq('id',academy.id);
   academy = {...academy,...data};
   alert('저장 완료!');
   render();
