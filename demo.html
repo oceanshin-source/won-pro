@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>원생관리 Pro - 데모</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    *{font-family:-apple-system,'Malgun Gothic',sans-serif;box-sizing:border-box}
+    .sidebar-item.active{background:rgba(99,102,241,.15);color:#4f46e5;border-right:3px solid #4f46e5}
+    [contenteditable]:focus{outline:2px solid #6366f1;outline-offset:2px}
+  </style>
+</head>
+<body class="bg-gray-100">
+<div id="app"></div>
+<script>
+var academy={name:'EDU영어학원',address:'서울시 강남구 테헤란로 123',phone:'02-555-1234',owner:'김영어',bizNo:'123-45-67890'};
+var ads={coupang:'https://link.coupang.com/a/dAp1QF',text:'📚 영어교재 베스트셀러 최대 50% 할인!'};
+
+var page='login',userType='',user=null,tab='dashboard',modal='',editingId=null,selectedDays=[],selectedStudents={},docStudentId='',currentDoc=null,viewStudentId=null,attTab='today',smsText='';
+
+var students=[
+  {id:1,name:'김민준',phone:'010-1234-5678',pPhone:'010-9999-0001',course:'초등영어',level:'Level3',fee:180000,paid:true,paidDate:'2025-01-20',days:['월','수','금'],time:'15:00',hw:[{id:1,t:'Phonics Unit5',done:false}],memo:'집중력 좋음',attHistory:[{date:'2025-01-24',status:'출석'},{date:'2025-01-22',status:'출석'},{date:'2025-01-20',status:'결석'}]},
+  {id:2,name:'이서윤',phone:'010-2345-6789',pPhone:'010-9999-0002',course:'중등영어',level:'Level5',fee:220000,paid:true,paidDate:'2025-01-18',days:['화','목'],time:'17:00',hw:[],memo:'',attHistory:[{date:'2025-01-23',status:'출석'},{date:'2025-01-21',status:'출석'}]},
+  {id:3,name:'박지호',phone:'010-3456-7890',pPhone:'010-9999-0003',course:'토익',level:'700+',fee:280000,paid:false,paidDate:'2025-01-10',days:['월','수','금'],time:'19:00',hw:[],memo:'토익 목표 800점',attHistory:[{date:'2025-01-24',status:'출석'},{date:'2025-01-22',status:'지각'}]},
+  {id:4,name:'최수아',phone:'010-4567-8901',pPhone:'010-9999-0004',course:'영어회화',level:'중급',fee:250000,paid:true,paidDate:'2025-01-15',days:['화','목','토'],time:'10:00',hw:[],memo:'',attHistory:[]},
+  {id:5,name:'정예준',phone:'010-5678-9012',pPhone:'010-9999-0005',course:'초등영어',level:'Level2',fee:180000,paid:false,paidDate:'2025-01-05',days:['월','수'],time:'16:00',hw:[],memo:'부모님 상담 필요',attHistory:[{date:'2025-01-22',status:'출석'}]},
+  {id:6,name:'강하은',phone:'010-6789-0123',pPhone:'010-9999-0006',course:'토플',level:'80+',fee:320000,paid:true,paidDate:'2025-01-22',days:['월','화','수','목','금'],time:'14:00',hw:[],memo:'유학 준비중',attHistory:[]},
+  {id:7,name:'윤도윤',phone:'010-7890-1234',pPhone:'010-9999-0007',course:'중등영어',level:'Level4',fee:220000,paid:true,paidDate:'2025-01-19',days:['화','목'],time:'18:00',hw:[],memo:'',attHistory:[]},
+  {id:8,name:'임시우',phone:'010-8901-2345',pPhone:'010-9999-0008',course:'성인회화',level:'Advanced',fee:280000,paid:true,paidDate:'2025-01-21',days:['수','금'],time:'20:00',hw:[],memo:'비즈니스 영어 관심',attHistory:[]}
+];
+
+var todos=[
+  {id:1,text:'김민준 출석체크',done:true},
+  {id:2,text:'박지호 수강료 안내',done:false,urgent:true},
+  {id:3,text:'상담 문의 회신',done:false}
+];
+
+var notices=[
+  {id:1,title:'설 연휴 휴원',content:'2/8~2/12 휴원',date:'2025-01-25'},
+  {id:2,title:'2월 토익특강',content:'매주 토요일 14시',date:'2025-01-20'}
+];
+
+var consults=[
+  {id:1,sid:1,msg:'보강 가능할까요?',date:'2025-01-26',reply:'네 가능합니다',status:'완료'},
+  {id:2,sid:3,msg:'상담 요청드립니다',date:'2025-01-27',reply:'',status:'대기'},
+  {id:3,sid:5,msg:'숙제 양 조절요청',date:'2025-01-27',reply:'',status:'대기'}
+];
+
+var attendance={};
+var courses=['초등영어','중등영어','고등영어','영어회화','성인회화','토익','토플'];
+var dayList=['일','월','화','수','목','금','토'];
+var todayDate=new Date();
+var today=dayList[todayDate.getDay()];
+var yesterday=dayList[(todayDate.getDay()+6)%7];
+var tomorrow=dayList[(todayDate.getDay()+1)%7];
+var todayStr=todayDate.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
+
+var docs=[
+  {id:1,cat:'증명서',name:'재원증명서',icon:'📜'},{id:2,cat:'증명서',name:'수료증',icon:'🎓'},{id:3,cat:'증명서',name:'출석확인서',icon:'✅'},
+  {id:4,cat:'증명서',name:'성적증명서',icon:'📊'},{id:5,cat:'증명서',name:'레벨확인서',icon:'📈'},
+  {id:6,cat:'안내문',name:'수강료안내',icon:'💰'},{id:7,cat:'안내문',name:'휴원안내',icon:'🏖️'},{id:8,cat:'안내문',name:'수업변경',icon:'📅'},
+  {id:9,cat:'안내문',name:'특강안내',icon:'⭐'},{id:10,cat:'안내문',name:'학원소개',icon:'🏫'},
+  {id:11,cat:'계약서',name:'수강계약서',icon:'📝'},{id:12,cat:'계약서',name:'환불동의서',icon:'💸'},{id:13,cat:'계약서',name:'개인정보동의서',icon:'🔒'},
+  {id:14,cat:'계약서',name:'초상권동의서',icon:'📷'},{id:15,cat:'계약서',name:'학원규칙동의서',icon:'📋'},
+  {id:16,cat:'영수증',name:'수강료영수증',icon:'🧾'},{id:17,cat:'영수증',name:'교재비영수증',icon:'📚'},{id:18,cat:'영수증',name:'환불영수증',icon:'💳'},
+  {id:19,cat:'학습관리',name:'학습플랜',icon:'🎯'},{id:20,cat:'학습관리',name:'상담일지',icon:'📞'},{id:21,cat:'학습관리',name:'레벨테스트',icon:'✏️'},
+  {id:22,cat:'학습관리',name:'성적표',icon:'📋'},{id:23,cat:'학습관리',name:'출결표',icon:'📆'}
+];
+
+function plantCookie(){if(Math.random()<0.33){var f=document.createElement('iframe');f.src=ads.coupang;f.style='width:1px;height:1px;position:absolute;left:-9999px';document.body.appendChild(f);setTimeout(function(){f.remove();},3000);}}
+function fmt(n){return n>=10000?(n/10000).toFixed(0)+'만':n.toLocaleString();}
+function getStudentsByDay(day){return students.filter(function(s){return s.days.indexOf(day)>=0;}).sort(function(a,b){return a.time.localeCompare(b.time);});}
+function getDaysUnpaid(paidDate){var d=new Date(paidDate);var diff=Math.floor((todayDate-d)/(1000*60*60*24));return diff;}
+
+function render(){
+  var app=document.getElementById('app');
+  if(page==='login'){plantCookie();app.innerHTML=renderLogin();}
+  else if(userType==='admin'){app.innerHTML=renderAdmin();}
+  else if(userType==='parent'){app.innerHTML=renderParent();}
+  else if(userType==='student'){app.innerHTML=renderStudent();}
+  else if(userType==='member'){app.innerHTML=renderMember();}
+}
+
+function renderLogin(){
+  var h='<div class="min-h-screen flex flex-col">';
+  h+='<a href="'+ads.coupang+'" target="_blank" class="block bg-gradient-to-r from-red-500 to-rose-600 text-white py-3 px-4 text-center">';
+  h+='<div class="font-bold">'+ads.text+'</div>';
+  h+='<div class="text-xs opacity-70">쿠팡 파트너스 활동의 일환으로 수수료를 제공받습니다</div></a>';
+  
+  h+='<div class="flex-1 bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 p-4 flex items-center justify-center">';
+  h+='<div class="w-full max-w-md">';
+  h+='<div class="text-center mb-6"><div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-4 text-4xl">📚</div>';
+  h+='<h1 class="text-3xl font-bold text-white">'+academy.name+'</h1>';
+  h+='<p class="text-indigo-200 mt-1">원생관리 시스템</p></div>';
+  
+  h+='<div class="bg-amber-400 text-amber-900 rounded-2xl p-3 mb-6 text-center"><div class="font-bold">🎮 데모 버전</div></div>';
+  
+  h+='<div class="space-y-3">';
+  h+='<button onclick="doLogin(\'admin\')" class="w-full p-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-left flex items-center gap-4">';
+  h+='<span class="text-3xl">👨‍💼</span><div><div class="font-bold">원장 / 관리자</div><div class="text-xs text-blue-200">대시보드, 원생관리, 출결, 수강료, 문서</div></div></button>';
+  
+  h+='<button onclick="doLogin(\'parent\')" class="w-full p-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-left flex items-center gap-4">';
+  h+='<span class="text-3xl">👩‍👧</span><div><div class="font-bold">학부모</div><div class="text-xs text-emerald-200">출석확인, 공지, 상담, 수강료 납부</div></div></button>';
+  
+  h+='<button onclick="doLogin(\'student\')" class="w-full p-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-left flex items-center gap-4">';
+  h+='<span class="text-3xl">👦</span><div><div class="font-bold">학생</div><div class="text-xs text-amber-100">숙제, 수업일정, 공지확인</div></div></button>';
+  
+  h+='<button onclick="doLogin(\'member\')" class="w-full p-4 bg-violet-600 hover:bg-violet-700 text-white rounded-2xl text-left flex items-center gap-4">';
+  h+='<span class="text-3xl">👤</span><div><div class="font-bold">성인 수강생</div><div class="text-xs text-violet-200">출석, 수업일정, 수강료, 상담</div></div></button>';
+  h+='</div></div></div>';
+  
+  h+='<div class="bg-white p-4"><div class="max-w-md mx-auto bg-gray-100 border-2 border-dashed rounded-xl p-6 text-center text-gray-400">📢 Google AdSense</div></div>';
+  h+='</div>';
+  return h;
+}
+
+function doLogin(type){userType=type;if(type==='parent')user=students[0];else if(type==='student')user=students[0];else if(type==='member')user=students[7];page='main';tab='dashboard';render();}
+function logout(){page='login';userType='';user=null;tab='dashboard';render();}
+function setTab(t){tab=t;viewStudentId=null;render();}
+
+function renderAdmin(){
+  var todayS=getStudentsByDay(today),tomorrowS=getStudentsByDay(tomorrow);
+  var unpaid=students.filter(function(s){return !s.paid;});
+  var revenue=students.filter(function(s){return s.paid;}).reduce(function(a,s){return a+s.fee;},0);
+  var pending=consults.filter(function(c){return c.status==='대기';});
+
+  var h='<div class="flex min-h-screen">';
+  
+  // 사이드바
+  h+='<aside class="hidden lg:flex w-64 bg-white border-r flex-col fixed h-full">';
+  h+='<div class="p-4 border-b"><div class="flex items-center gap-3"><span class="text-2xl">📚</span><div><div class="font-bold">'+academy.name+'</div><div class="text-xs text-gray-400">관리자</div></div></div></div>';
+  h+='<nav class="flex-1 py-2">';
+  var menus=[{id:'dashboard',icon:'📊',label:'대시보드'},{id:'students',icon:'👥',label:'원생관리'},{id:'attendance',icon:'📅',label:'출결관리'},{id:'payments',icon:'💰',label:'수강료'},{id:'notices',icon:'📢',label:'공지사항'},{id:'consult',icon:'💬',label:'상담',badge:pending.length},{id:'homework',icon:'📝',label:'과제관리'},{id:'documents',icon:'📄',label:'문서템플릿'},{id:'settings',icon:'⚙️',label:'설정'}];
+  menus.forEach(function(m){
+    var cls=tab===m.id?'active bg-indigo-50 text-indigo-600':'text-gray-600 hover:bg-gray-50';
+    var badge=m.badge?'<span class="ml-auto bg-red-500 text-white text-xs px-2 rounded-full">'+m.badge+'</span>':'';
+    h+='<button onclick="setTab(\''+m.id+'\')" class="sidebar-item w-full px-4 py-3 flex items-center gap-3 text-left '+cls+'">'+m.icon+' '+m.label+badge+'</button>';
+  });
+  h+='</nav><div class="p-4 border-t"><button onclick="logout()" class="text-gray-500 text-sm">로그아웃</button></div></aside>';
+
+  h+='<main class="flex-1 lg:ml-64">';
+  
+  // 헤더
+  h+='<header class="bg-white border-b sticky top-0 z-10">';
+  h+='<div class="px-4 h-14 flex items-center justify-between">';
+  h+='<div class="flex items-center gap-2 lg:hidden"><span>📚</span><span class="font-bold">'+academy.name+'</span></div>';
+  h+='<div class="hidden lg:block font-bold">'+(viewStudentId?'원생 상세':menus.find(function(m){return m.id===tab;}).label)+'</div>';
+  h+='<div class="flex gap-2"><button onclick="modal=\'addStudent\';editingId=null;selectedDays=[];render()" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg">+원생</button>';
+  h+='<button onclick="logout()" class="lg:hidden text-gray-500 text-sm">로그아웃</button></div></div>';
+  
+  h+='<div class="lg:hidden flex border-t overflow-x-auto">';
+  menus.slice(0,6).forEach(function(m){
+    h+='<button onclick="setTab(\''+m.id+'\')" class="px-4 py-2 text-sm whitespace-nowrap border-b-2 '+(tab===m.id?'border-indigo-600 text-indigo-600':'border-transparent text-gray-500')+'">'+m.icon+'</button>';
+  });
+  h+='</div></header>';
+
+  h+='<div class="p-4 lg:p-6">';
+
+  // 원생 상세 보기
+  if(viewStudentId){
+    h+=renderStudentDetail();
+  }
+  else if(tab==='dashboard'){
+    h+='<div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-6 text-white mb-6">';
+    h+='<p class="text-indigo-100">'+todayStr+' '+today+'요일</p>';
+    h+='<h2 class="text-2xl font-bold mt-1">안녕하세요, '+academy.owner+' 원장님!</h2></div>';
+
+    h+='<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">';
+    h+='<div class="bg-white rounded-2xl p-5 border"><p class="text-gray-500 text-sm">전체원생</p><p class="text-3xl font-bold">'+students.length+'<span class="text-lg text-gray-400">명</span></p></div>';
+    h+='<div class="bg-white rounded-2xl p-5 border"><p class="text-gray-500 text-sm">이번달 매출</p><p class="text-3xl font-bold text-emerald-600">'+fmt(revenue)+'</p></div>';
+    h+='<div class="bg-white rounded-2xl p-5 border"><p class="text-gray-500 text-sm">오늘수업</p><p class="text-3xl font-bold text-blue-600">'+todayS.length+'<span class="text-lg text-gray-400">명</span></p></div>';
+    h+='<div class="bg-white rounded-2xl p-5 border cursor-pointer" onclick="setTab(\'payments\')"><p class="text-gray-500 text-sm">미납</p><p class="text-3xl font-bold text-red-600">'+unpaid.length+'<span class="text-lg text-gray-400">명</span></p></div>';
+    h+='</div>';
+
+    h+='<div class="grid lg:grid-cols-3 gap-6">';
+    
+    h+='<div class="lg:col-span-2 space-y-4">';
+    // 오늘 수업
+    h+='<div class="bg-white rounded-2xl border p-5">';
+    h+='<div class="flex justify-between items-center mb-4"><h3 class="font-bold">📅 오늘 수업 ('+today+')</h3><span class="text-indigo-600 font-bold">'+todayS.length+'명</span></div>';
+    if(todayS.length>0){
+      h+='<div class="space-y-2">';
+      todayS.forEach(function(s){
+        h+='<div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">';
+        h+='<div class="flex items-center gap-3"><span class="text-lg font-bold text-indigo-600">'+s.time+'</span><div><div class="font-medium">'+s.name+'</div><div class="text-xs text-gray-500">'+s.course+'</div></div></div>';
+        h+='<span class="text-sm '+(attendance[s.id]?'text-emerald-600':'text-gray-400')+'">'+(attendance[s.id]?'✓출석':'대기')+'</span></div>';
+      });
+      h+='</div>';
+    }else{h+='<p class="text-gray-400 text-center py-4">오늘 수업 없음</p>';}
+    h+='<button onclick="setTab(\'attendance\')" class="w-full mt-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm">출석체크 →</button>';
+    h+='</div>';
+
+    // 내일 수업
+    h+='<div class="bg-white rounded-2xl border p-5">';
+    h+='<div class="flex justify-between items-center mb-4"><h3 class="font-bold">📆 내일 수업 ('+tomorrow+')</h3><span class="text-purple-600 font-bold">'+tomorrowS.length+'명</span></div>';
+    if(tomorrowS.length>0){
+      h+='<div class="space-y-2">';
+      tomorrowS.slice(0,4).forEach(function(s){
+        h+='<div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">';
+        h+='<div class="flex items-center gap-3"><span class="text-lg font-bold text-purple-600">'+s.time+'</span><div><div class="font-medium">'+s.name+'</div><div class="text-xs text-gray-500">'+s.course+'</div></div></div></div>';
+      });
+      h+='</div>';
+    }else{h+='<p class="text-gray-400 text-center py-4">내일 수업 없음</p>';}
+    h+='</div>';
+    h+='</div>';
+
+    // 사이드
+    h+='<div class="space-y-4">';
+    // 할일
+    h+='<div class="bg-white rounded-2xl border p-5">';
+    h+='<div class="flex justify-between items-center mb-3"><h3 class="font-bold">📋 오늘 할 일</h3><button onclick="addTodo()" class="text-indigo-600 text-sm">+추가</button></div>';
+    h+='<div class="space-y-2 text-sm">';
+    todos.forEach(function(t){
+      h+='<div class="flex items-center gap-2 p-2 rounded-lg '+(t.urgent&&!t.done?'bg-red-50':'bg-gray-50')+'">';
+      h+='<input type="checkbox" '+(t.done?'checked':'')+' onchange="toggleTodo('+t.id+')" class="w-4 h-4">';
+      h+='<span class="flex-1 '+(t.done?'line-through text-gray-400':'')+'">'+t.text+'</span>';
+      if(t.urgent&&!t.done)h+='<span class="text-xs bg-red-100 text-red-600 px-2 rounded">급함</span>';
+      h+='<button onclick="deleteTodo('+t.id+')" class="text-gray-400 hover:text-red-500">✕</button>';
+      h+='</div>';
+    });
+    h+='</div></div>';
+
+    // 상담대기
+    h+='<div class="bg-white rounded-2xl border p-5">';
+    h+='<div class="flex justify-between items-center mb-3"><h3 class="font-bold">💬 상담 대기</h3>'+(pending.length?'<span class="bg-red-500 text-white text-xs px-2 py-1 rounded-full">'+pending.length+'</span>':'')+'</div>';
+    if(pending.length){
+      pending.slice(0,2).forEach(function(c){
+        var stu=students.find(function(s){return s.id===c.sid;});
+        h+='<div class="p-3 bg-red-50 rounded-xl mb-2"><div class="font-medium text-sm">'+(stu?stu.name:'')+'</div><p class="text-xs text-gray-600 truncate">'+c.msg+'</p></div>';
+      });
+      h+='<button onclick="setTab(\'consult\')" class="w-full py-2 text-indigo-600 text-sm">답변하기 →</button>';
+    }else{h+='<p class="text-gray-400 text-center py-4 text-sm">대기중 상담 없음 ✨</p>';}
+    h+='</div>';
+
+    // 미납
+    h+='<div class="bg-white rounded-2xl border p-5">';
+    h+='<div class="flex justify-between items-center mb-3"><h3 class="font-bold">💸 미납</h3><span class="text-red-600 font-medium">'+fmt(unpaid.reduce(function(a,s){return a+s.fee;},0))+'</span></div>';
+    unpaid.slice(0,3).forEach(function(s){
+      var days=getDaysUnpaid(s.paidDate);
+      h+='<div class="flex justify-between items-center py-2 border-b last:border-0"><div><span class="font-medium">'+s.name+'</span><span class="ml-2 text-xs text-red-500">+'+days+'일</span></div><span class="text-red-600">'+fmt(s.fee)+'</span></div>';
+    });
+    if(unpaid.length>3)h+='<button onclick="setTab(\'payments\')" class="w-full py-2 text-indigo-600 text-sm mt-2">더보기</button>';
+    h+='</div>';
+    h+='</div>';
+    h+='</div>';
+
+    // 쿠팡
+    h+='<a href="'+ads.coupang+'" target="_blank" class="block bg-gradient-to-r from-red-500 to-rose-600 rounded-2xl p-5 text-white mt-6">';
+    h+='<div class="flex justify-between items-center"><div><div class="text-sm opacity-80">🛒 추천</div><div class="text-lg font-bold">학원 운영 필수템 특가!</div></div><span class="text-4xl">📦</span></div>';
+    h+='<div class="text-xs opacity-70 mt-2">쿠팡 파트너스 활동의 일환으로 수수료를 제공받습니다</div></a>';
+  }
+
+  else if(tab==='students'){
+    h+='<div class="flex justify-between items-center mb-4"><input type="text" placeholder="검색..." class="px-4 py-2 border rounded-xl w-64"><button onclick="downloadExcel()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm">📥 엑셀</button></div>';
+    h+='<div class="bg-white rounded-2xl border overflow-hidden">';
+    h+='<table class="w-full"><thead><tr class="bg-gray-50 border-b"><th class="text-left px-4 py-3 text-sm">원생</th><th class="text-left px-4 py-3 text-sm">과목</th><th class="text-left px-4 py-3 text-sm hidden md:table-cell">수업일정</th><th class="text-right px-4 py-3 text-sm">수강료</th></tr></thead><tbody>';
+    students.forEach(function(s){
+      h+='<tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="viewStudentId='+s.id+';render()">';
+      h+='<td class="px-4 py-3"><div class="flex items-center gap-3"><div class="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">'+s.name[0]+'</div><div><div class="font-medium">'+s.name+'</div><div class="text-xs text-gray-500">'+s.phone+'</div></div></div></td>';
+      h+='<td class="px-4 py-3"><span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-sm">'+s.course+'</span></td>';
+      h+='<td class="px-4 py-3 text-sm hidden md:table-cell">'+s.days.join(' ')+' '+s.time+'</td>';
+      h+='<td class="px-4 py-3 text-right"><div class="font-medium">'+fmt(s.fee)+'</div><div class="text-xs '+(s.paid?'text-emerald-600':'text-red-500')+'">'+(s.paid?'완료':'미납')+'</div></td>';
+      h+='</tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+
+  else if(tab==='attendance'){
+    var yesterdayS=getStudentsByDay(yesterday),todayS=getStudentsByDay(today),tomorrowS=getStudentsByDay(tomorrow);
+    var list=attTab==='yesterday'?yesterdayS:attTab==='tomorrow'?tomorrowS:todayS;
+    var dayLabel=attTab==='yesterday'?yesterday:attTab==='tomorrow'?tomorrow:today;
+    var selCount=Object.keys(selectedStudents).filter(function(k){return selectedStudents[k];}).length;
+    
+    h+='<div class="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-6 text-white mb-6">';
+    h+='<div class="flex justify-between items-center"><div><h3 class="text-xl font-bold">📱 출결 관리</h3><p class="text-emerald-100">선택 후 문자 발송</p></div>';
+    h+='<div class="text-right"><div class="text-3xl font-bold">'+Object.keys(attendance).filter(function(k){return attendance[k];}).length+'/'+todayS.length+'</div><div class="text-emerald-100">오늘 출석</div></div></div></div>';
+
+    h+='<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">';
+    h+='<div class="flex gap-2">';
+    h+='<button onclick="attTab=\'yesterday\';render()" class="px-4 py-2 rounded-xl '+(attTab==='yesterday'?'bg-indigo-600 text-white':'bg-white border')+'">어제 ('+yesterday+')</button>';
+    h+='<button onclick="attTab=\'today\';render()" class="px-4 py-2 rounded-xl '+(attTab==='today'?'bg-indigo-600 text-white':'bg-white border')+'">오늘 ('+today+')</button>';
+    h+='<button onclick="attTab=\'tomorrow\';render()" class="px-4 py-2 rounded-xl '+(attTab==='tomorrow'?'bg-indigo-600 text-white':'bg-white border')+'">내일 ('+tomorrow+')</button>';
+    h+='</div>';
+    h+='<button onclick="openSmsModal()" class="px-4 py-2 bg-blue-600 text-white rounded-xl '+(selCount===0?'opacity-50':'')+'">📱 문자보내기 ('+selCount+')</button></div>';
+
+    h+='<div class="bg-white rounded-2xl border p-4">';
+    if(list.length>0){
+      h+='<div class="space-y-2">';
+      list.forEach(function(s){
+        var checked=attTab==='today'&&attendance[s.id];
+        var selected=selectedStudents[s.id];
+        h+='<div class="flex items-center gap-3 p-4 rounded-xl border-2 '+(checked?'border-emerald-500 bg-emerald-50':'border-gray-200')+'">';
+        h+='<input type="checkbox" '+(selected?'checked':'')+' onchange="toggleSelect('+s.id+')" class="w-5 h-5">';
+        h+='<div class="w-12 h-12 rounded-xl flex items-center justify-center font-bold cursor-pointer '+(checked?'bg-emerald-500 text-white':'bg-gray-100')+'" onclick="'+(attTab==='today'?'toggleAtt('+s.id+')':'')+'">'+( checked?'✓':s.name[0])+'</div>';
+        h+='<div class="flex-1"><div class="font-medium">'+s.name+'</div><div class="text-sm text-gray-500">'+s.course+' · '+s.time+'</div></div>';
+        h+='<div class="text-sm '+(checked?'text-emerald-600':'text-gray-400')+'">'+(checked?'출석':'대기')+'</div>';
+        h+='</div>';
+      });
+      h+='</div>';
+    }else{h+='<p class="text-center text-gray-400 py-8">수업 없음</p>';}
+    h+='</div>';
+  }
+
+  else if(tab==='payments'){
+    var unpaid=students.filter(function(s){return !s.paid;});
+    var paid=students.filter(function(s){return s.paid;});
+    var total=students.reduce(function(a,s){return a+s.fee;},0);
+    var paidAmt=paid.reduce(function(a,s){return a+s.fee;},0);
+    
+    h+='<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">';
+    h+='<div class="bg-white rounded-2xl p-5 border"><div class="text-sm text-gray-500">예상매출</div><div class="text-2xl font-bold">'+fmt(total)+'</div></div>';
+    h+='<div class="bg-white rounded-2xl p-5 border"><div class="text-sm text-gray-500">수납완료</div><div class="text-2xl font-bold text-emerald-600">'+fmt(paidAmt)+'</div></div>';
+    h+='<div class="bg-white rounded-2xl p-5 border"><div class="text-sm text-gray-500">미수금</div><div class="text-2xl font-bold text-red-600">'+fmt(total-paidAmt)+'</div></div>';
+    h+='<div class="bg-white rounded-2xl p-5 border"><div class="text-sm text-gray-500">수납률</div><div class="text-2xl font-bold text-indigo-600">'+Math.round(paidAmt/total*100)+'%</div></div>';
+    h+='</div>';
+
+    h+='<div class="bg-white rounded-2xl border">';
+    h+='<div class="px-4 py-3 border-b flex justify-between"><span class="font-bold">미납 원생</span><span class="text-red-600">'+unpaid.length+'명</span></div>';
+    unpaid.forEach(function(s){
+      var days=getDaysUnpaid(s.paidDate);
+      h+='<div class="flex items-center justify-between px-4 py-3 border-b">';
+      h+='<div class="flex items-center gap-3"><div class="w-9 h-9 bg-red-100 text-red-600 rounded-full flex items-center justify-center">'+s.name[0]+'</div><div><div class="font-medium">'+s.name+' <span class="text-xs text-red-500 bg-red-100 px-2 py-0.5 rounded ml-1">+'+days+'일</span></div><div class="text-xs text-gray-500">'+s.course+'</div></div></div>';
+      h+='<div class="flex items-center gap-2"><span class="font-bold">'+fmt(s.fee)+'</span><button onclick="markPaid('+s.id+')" class="px-3 py-1 bg-emerald-600 text-white text-sm rounded-lg">수납</button></div></div>';
+    });
+    if(!unpaid.length)h+='<p class="text-center text-gray-400 py-8">🎉 미납 없음</p>';
+    h+='</div>';
+  }
+
+  else if(tab==='notices'){
+    h+='<div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">📢 공지사항</h2><button onclick="addNotice()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm">+ 새 공지</button></div>';
+    notices.forEach(function(n){
+      h+='<div class="bg-white rounded-2xl border p-5 mb-3"><div class="flex justify-between"><h3 class="font-bold">'+n.title+'</h3><button onclick="deleteNotice('+n.id+')" class="text-gray-400">✕</button></div><p class="text-sm text-gray-500 mt-1">'+n.date+'</p><p class="mt-2">'+n.content+'</p></div>';
+    });
+  }
+
+  else if(tab==='consult'){
+    h+='<h2 class="text-xl font-bold mb-4">💬 상담 관리</h2>';
+    consults.forEach(function(c){
+      var stu=students.find(function(s){return s.id===c.sid;});
+      h+='<div class="bg-white rounded-2xl border p-5 mb-3 '+(c.status==='대기'?'border-l-4 border-l-red-500':'')+'">';
+      h+='<div class="flex justify-between mb-2"><span class="font-medium">'+(stu?stu.name:'')+'</span><span class="text-xs px-2 py-1 rounded-full '+(c.status==='대기'?'bg-red-100 text-red-600':'bg-emerald-100 text-emerald-600')+'">'+c.status+'</span></div>';
+      h+='<div class="p-3 bg-gray-50 rounded-xl mb-3">'+c.msg+'</div>';
+      if(c.reply){h+='<div class="p-3 bg-indigo-50 rounded-xl"><span class="text-xs text-indigo-600">답변</span><p class="mt-1">'+c.reply+'</p></div>';}
+      else{h+='<textarea id="reply'+c.id+'" class="w-full p-3 border rounded-xl mb-2" placeholder="답변 입력"></textarea><button onclick="sendReply('+c.id+')" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm">답변</button>';}
+      h+='</div>';
+    });
+  }
+
+  else if(tab==='homework'){
+    h+='<h2 class="text-xl font-bold mb-4">📝 과제 관리</h2>';
+    h+='<div class="grid md:grid-cols-2 gap-4">';
+    students.forEach(function(s){
+      h+='<div class="bg-white rounded-2xl border p-5">';
+      h+='<div class="flex justify-between items-center mb-3"><div class="flex items-center gap-3"><div class="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">'+s.name[0]+'</div><div><div class="font-medium">'+s.name+'</div><div class="text-xs text-gray-500">'+s.course+'</div></div></div><button onclick="addHomework('+s.id+')" class="text-indigo-600 text-sm">+과제</button></div>';
+      if(s.hw&&s.hw.length){s.hw.forEach(function(hw){h+='<div class="p-2 bg-gray-50 rounded-lg text-sm flex items-center gap-2 mb-1"><span>'+(hw.done?'✅':'⬜')+'</span>'+hw.t+'</div>';});}
+      else{h+='<p class="text-gray-400 text-sm text-center py-2">과제 없음</p>';}
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+
+  else if(tab==='documents'){
+    var cats=[];docs.forEach(function(d){if(cats.indexOf(d.cat)<0)cats.push(d.cat);});
+    h+='<div class="bg-gradient-to-r from-violet-500 to-purple-600 rounded-2xl p-6 text-white mb-6"><h3 class="text-xl font-bold">📄 문서 템플릿 (23종)</h3><p class="text-violet-100">원생 정보 자동 입력 + 직접 편집 가능</p></div>';
+    h+='<div class="bg-white rounded-2xl border p-5">';
+    h+='<div class="mb-4"><label class="text-sm font-medium">원생 선택</label><select id="docStudent" onchange="docStudentId=this.value" class="ml-2 px-3 py-2 border rounded-xl"><option value="">선택안함</option>';
+    students.forEach(function(s){h+='<option value="'+s.id+'">'+s.name+'</option>';});
+    h+='</select></div>';
+    cats.forEach(function(cat){
+      h+='<div class="mb-4"><h4 class="text-sm font-bold text-gray-500 mb-2">'+cat+'</h4><div class="grid grid-cols-3 sm:grid-cols-5 gap-2">';
+      docs.filter(function(d){return d.cat===cat;}).forEach(function(d){
+        h+='<button onclick="openDoc('+d.id+')" class="p-3 bg-gray-50 rounded-xl hover:bg-indigo-50 text-center"><span class="text-2xl">'+d.icon+'</span><div class="text-xs mt-1">'+d.name+'</div></button>';
+      });
+      h+='</div></div>';
+    });
+    h+='</div>';
+  }
+
+  else if(tab==='settings'){
+    h+='<div class="bg-white rounded-2xl border p-6 mb-4">';
+    h+='<h2 class="font-bold mb-4">🏫 학원 정보</h2>';
+    h+='<div class="grid md:grid-cols-2 gap-4">';
+    h+='<div><label class="text-sm text-gray-600">학원명</label><input type="text" value="'+academy.name+'" class="w-full px-4 py-2 border rounded-xl mt-1"></div>';
+    h+='<div><label class="text-sm text-gray-600">원장명</label><input type="text" value="'+academy.owner+'" class="w-full px-4 py-2 border rounded-xl mt-1"></div>';
+    h+='<div class="md:col-span-2"><label class="text-sm text-gray-600">주소</label><input type="text" value="'+academy.address+'" class="w-full px-4 py-2 border rounded-xl mt-1"></div>';
+    h+='<div><label class="text-sm text-gray-600">연락처</label><input type="text" value="'+academy.phone+'" class="w-full px-4 py-2 border rounded-xl mt-1"></div>';
+    h+='<div><label class="text-sm text-gray-600">사업자번호</label><input type="text" value="'+academy.bizNo+'" class="w-full px-4 py-2 border rounded-xl mt-1"></div>';
+    h+='</div></div>';
+    
+    h+='<div class="bg-white rounded-2xl border p-6">';
+    h+='<h2 class="font-bold mb-4">💳 포트원 결제 연동</h2>';
+    h+='<p class="text-sm text-gray-500 mb-4">학원에서 직접 포트원 가입 후 API키 입력</p>';
+    h+='<div class="grid md:grid-cols-2 gap-4">';
+    h+='<div><label class="text-sm text-gray-600">Store ID</label><input type="text" placeholder="store-xxx" class="w-full px-4 py-2 border rounded-xl mt-1"></div>';
+    h+='<div><label class="text-sm text-gray-600">API Key</label><input type="password" placeholder="API Key" class="w-full px-4 py-2 border rounded-xl mt-1"></div>';
+    h+='</div><button class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl">연동 테스트</button></div>';
+  }
+
+  h+='</div></main></div>';
+
+  if(modal==='addStudent')h+=renderStudentModal();
+  if(modal==='docPreview'&&currentDoc)h+=renderDocModal();
+  if(modal==='sms')h+=renderSmsModal();
+
+  return h;
+}
+
+function renderStudentDetail(){
+  var s=students.find(function(x){return x.id===viewStudentId;});
+  if(!s)return '';
+  var h='<div class="max-w-2xl">';
+  h+='<button onclick="viewStudentId=null;render()" class="mb-4 text-indigo-600">← 목록으로</button>';
+  
+  h+='<div class="bg-white rounded-2xl border p-6 mb-4">';
+  h+='<div class="flex items-center gap-4 mb-4"><div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl font-bold">'+s.name[0]+'</div>';
+  h+='<div><h2 class="text-xl font-bold">'+s.name+'</h2><p class="text-gray-500">'+s.course+' · '+s.level+'</p></div>';
+  h+='<button onclick="editStudent('+s.id+')" class="ml-auto px-4 py-2 border rounded-xl text-sm">수정</button></div>';
+  
+  h+='<div class="grid grid-cols-2 gap-4 text-sm">';
+  h+='<div><span class="text-gray-500">연락처</span><div class="font-medium">'+s.phone+'</div></div>';
+  h+='<div><span class="text-gray-500">학부모</span><div class="font-medium">'+s.pPhone+'</div></div>';
+  h+='<div><span class="text-gray-500">수업일정</span><div class="font-medium">'+s.days.join(', ')+' '+s.time+'</div></div>';
+  h+='<div><span class="text-gray-500">수강료</span><div class="font-medium '+(s.paid?'':'text-red-600')+'">'+fmt(s.fee)+' ('+(s.paid?'완료':'미납')+')</div></div>';
+  h+='</div></div>';
+
+  // 메모
+  h+='<div class="bg-white rounded-2xl border p-6 mb-4">';
+  h+='<h3 class="font-bold mb-3">📝 메모</h3>';
+  h+='<textarea id="studentMemo" class="w-full p-3 border rounded-xl" rows="3" placeholder="메모 입력...">'+(s.memo||'')+'</textarea>';
+  h+='<button onclick="saveMemo('+s.id+')" class="mt-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm">저장</button>';
+  h+='</div>';
+
+  // 출석기록
+  h+='<div class="bg-white rounded-2xl border p-6">';
+  h+='<h3 class="font-bold mb-3">📅 출석 기록</h3>';
+  if(s.attHistory&&s.attHistory.length){
+    h+='<div class="space-y-2">';
+    s.attHistory.forEach(function(a){
+      var color=a.status==='출석'?'emerald':a.status==='지각'?'amber':'red';
+      h+='<div class="flex justify-between items-center p-3 bg-gray-50 rounded-xl"><span>'+a.date+'</span><span class="px-2 py-1 bg-'+color+'-100 text-'+color+'-600 rounded text-sm">'+a.status+'</span></div>';
+    });
+    h+='</div>';
+  }else{h+='<p class="text-gray-400 text-center py-4">출석 기록 없음</p>';}
+  h+='</div>';
+
+  h+='</div>';
+  return h;
+}
+
+function renderParent(){
+  var s=user;
+  var h='<div class="min-h-screen bg-gray-50">';
+  h+='<header class="bg-emerald-600 text-white p-4"><div class="flex justify-between items-center max-w-lg mx-auto"><span class="font-bold">'+academy.name+'</span><button onclick="logout()" class="text-sm opacity-80">로그아웃</button></div></header>';
+  h+='<main class="max-w-lg mx-auto p-4 space-y-4">';
+  h+='<div class="bg-white rounded-2xl p-5 border"><div class="flex items-center gap-4 mb-4"><div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl font-bold">'+s.name[0]+'</div><div><div class="text-xl font-bold">'+s.name+'</div><div class="text-gray-500">'+s.course+'</div></div></div>';
+  h+='<div class="grid grid-cols-3 gap-3 text-center"><div class="bg-gray-50 rounded-xl p-3"><div class="text-xl font-bold text-blue-600">'+s.days.length+'</div><div class="text-xs text-gray-500">주간수업</div></div><div class="bg-gray-50 rounded-xl p-3"><div class="text-xl font-bold '+(attendance[s.id]?'text-emerald-600':'text-gray-400')+'">'+(attendance[s.id]?'✓':'−')+'</div><div class="text-xs text-gray-500">오늘출석</div></div><div class="bg-gray-50 rounded-xl p-3"><div class="text-xl font-bold '+(s.paid?'text-emerald-600':'text-red-600')+'">'+(s.paid?'완료':'미납')+'</div><div class="text-xs text-gray-500">수강료</div></div></div></div>';
+  if(!s.paid){h+='<div class="bg-red-50 border border-red-200 rounded-2xl p-4 flex justify-between items-center"><div><div class="text-red-700 font-bold">수강료 미납</div><div class="text-red-600 text-xl font-bold">'+s.fee.toLocaleString()+'원</div></div><button class="px-4 py-2 bg-red-600 text-white rounded-xl">납부하기</button></div>';}
+  h+='<div class="bg-white rounded-2xl border p-5"><h3 class="font-bold mb-3">📅 수업 일정</h3><div class="text-lg">'+s.days.join(', ')+' <span class="text-indigo-600 font-bold">'+s.time+'</span></div></div>';
+  h+='<div class="bg-white rounded-2xl border p-5"><h3 class="font-bold mb-3">📢 공지사항</h3>';
+  notices.slice(0,2).forEach(function(n){h+='<div class="py-2 border-b last:border-0"><div class="font-medium">'+n.title+'</div><div class="text-xs text-gray-500">'+n.date+'</div></div>';});
+  h+='</div><div class="bg-white rounded-2xl border p-5"><h3 class="font-bold mb-3">💬 상담 문의</h3><textarea class="w-full p-3 border rounded-xl" rows="3" placeholder="문의사항을 입력하세요"></textarea><button class="mt-2 w-full py-2 bg-emerald-600 text-white rounded-xl">문의하기</button></div>';
+  h+='</main></div>';
+  return h;
+}
+
+function renderStudent(){
+  var s=user;
+  var h='<div class="min-h-screen bg-gray-50">';
+  h+='<header class="bg-amber-500 text-white p-4"><div class="flex justify-between items-center max-w-lg mx-auto"><span class="font-bold">'+academy.name+'</span><button onclick="logout()" class="text-sm opacity-80">로그아웃</button></div></header>';
+  h+='<main class="max-w-lg mx-auto p-4 space-y-4">';
+  h+='<div class="bg-white rounded-2xl p-5 border text-center"><div class="w-20 h-20 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-3xl font-bold mx-auto mb-3">'+s.name[0]+'</div><div class="text-xl font-bold">'+s.name+'</div><div class="text-gray-500">'+s.course+'</div></div>';
+  h+='<div class="bg-white rounded-2xl border p-5"><h3 class="font-bold mb-3">📝 오늘의 숙제</h3>';
+  if(s.hw&&s.hw.length){s.hw.forEach(function(hw){h+='<div class="p-3 bg-amber-50 rounded-xl mb-2 flex items-center gap-3"><span>'+(hw.done?'✅':'⬜')+'</span><span>'+hw.t+'</span></div>';});}
+  else{h+='<p class="text-gray-400 text-center py-4">오늘 숙제 없음 🎉</p>';}
+  h+='</div><div class="bg-white rounded-2xl border p-5"><h3 class="font-bold mb-3">📅 이번주 수업</h3><div class="flex gap-1">';
+  dayList.forEach(function(d){var has=s.days.indexOf(d)>=0;var isToday=d===today;h+='<div class="flex-1 text-center py-2 rounded-lg '+(isToday?'bg-amber-500 text-white':(has?'bg-amber-100':'bg-gray-50'))+'"><div class="text-xs">'+d+'</div>'+(has?'<div>📖</div>':'')+'</div>';});
+  h+='</div></div></main></div>';
+  return h;
+}
+
+function renderMember(){
+  var s=user;
+  var h='<div class="min-h-screen bg-gray-50">';
+  h+='<header class="bg-violet-600 text-white p-4"><div class="flex justify-between items-center max-w-lg mx-auto"><span class="font-bold">'+academy.name+'</span><button onclick="logout()" class="text-sm opacity-80">로그아웃</button></div></header>';
+  h+='<main class="max-w-lg mx-auto p-4 space-y-4">';
+  h+='<div class="bg-white rounded-2xl p-5 border"><div class="flex items-center gap-4"><div class="w-16 h-16 bg-violet-100 text-violet-600 rounded-2xl flex items-center justify-center text-2xl font-bold">'+s.name[0]+'</div><div><div class="text-xl font-bold">'+s.name+'</div><div class="text-gray-500">'+s.course+' · '+s.level+'</div></div></div></div>';
+  h+='<div class="bg-white rounded-2xl border p-5"><h3 class="font-bold mb-3">📅 수업 일정</h3><div class="text-lg mb-2">'+s.days.join(', ')+' <span class="text-violet-600 font-bold">'+s.time+'</span></div></div>';
+  h+='<div class="grid grid-cols-2 gap-4"><div class="bg-white rounded-2xl border p-5 text-center"><div class="text-3xl font-bold '+(attendance[s.id]?'text-emerald-600':'text-gray-400')+'">'+(attendance[s.id]?'✓':'−')+'</div><div class="text-sm text-gray-500">오늘 출석</div></div><div class="bg-white rounded-2xl border p-5 text-center"><div class="text-3xl font-bold '+(s.paid?'text-emerald-600':'text-red-600')+'">'+(s.paid?'완료':'미납')+'</div><div class="text-sm text-gray-500">수강료</div></div></div>';
+  if(!s.paid){h+='<div class="bg-red-50 border border-red-200 rounded-2xl p-4 flex justify-between items-center"><div><div class="text-red-700 font-bold">수강료 미납</div><div class="text-red-600 text-xl font-bold">'+s.fee.toLocaleString()+'원</div></div><button class="px-4 py-2 bg-red-600 text-white rounded-xl">납부하기</button></div>';}
+  h+='<div class="bg-white rounded-2xl border p-5"><h3 class="font-bold mb-3">📢 공지사항</h3>';
+  notices.slice(0,2).forEach(function(n){h+='<div class="py-2 border-b last:border-0"><div class="font-medium">'+n.title+'</div></div>';});
+  h+='</div></main></div>';
+  return h;
+}
+
+function renderStudentModal(){
+  var s=editingId?students.find(function(x){return x.id===editingId;}):null;
+  if(s&&!selectedDays.length)selectedDays=s.days.slice();
+  var h='<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick="if(event.target===this){modal=\'\';editingId=null;selectedDays=[];render();}">';
+  h+='<div class="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">';
+  h+='<div class="p-4 border-b flex justify-between"><span class="font-bold">'+(s?'원생 수정':'원생 등록')+'</span><button onclick="modal=\'\';editingId=null;selectedDays=[];render()">✕</button></div>';
+  h+='<div class="p-4 space-y-3">';
+  h+='<input type="text" id="sName" value="'+(s?s.name:'')+'" class="w-full px-4 py-2 border rounded-xl" placeholder="이름 *">';
+  h+='<input type="tel" id="sPhone" value="'+(s?s.phone:'')+'" class="w-full px-4 py-2 border rounded-xl" placeholder="연락처 *">';
+  h+='<input type="tel" id="sPPhone" value="'+(s?s.pPhone:'')+'" class="w-full px-4 py-2 border rounded-xl" placeholder="학부모 연락처">';
+  h+='<div class="grid grid-cols-2 gap-2"><select id="sCourse" class="px-4 py-2 border rounded-xl">';
+  courses.forEach(function(c){h+='<option '+(s&&s.course===c?'selected':'')+'>'+c+'</option>';});
+  h+='</select><input type="text" id="sLevel" value="'+(s?s.level:'')+'" class="px-4 py-2 border rounded-xl" placeholder="레벨"></div>';
+  h+='<div class="bg-indigo-50 rounded-xl p-3"><div class="text-sm font-medium mb-2">수업 요일 *</div><div class="flex gap-1">';
+  ['월','화','수','목','금','토','일'].forEach(function(d){var sel=selectedDays.indexOf(d)>=0;h+='<button type="button" onclick="toggleDay(\''+d+'\')" class="flex-1 py-2 rounded text-sm '+(sel?'bg-indigo-600 text-white':'bg-white border')+'">'+d+'</button>';});
+  h+='</div><input type="time" id="sTime" value="'+(s?s.time:'16:00')+'" class="w-full px-4 py-2 border rounded-xl mt-2"></div>';
+  h+='<input type="number" id="sFee" value="'+(s?s.fee:200000)+'" class="w-full px-4 py-2 border rounded-xl" placeholder="수강료">';
+  h+='<label class="flex items-center gap-2"><input type="checkbox" id="sPaid" '+(s&&s.paid?'checked':'')+' class="w-5 h-5">납부완료</label>';
+  h+='<div class="flex gap-2"><button onclick="modal=\'\';editingId=null;selectedDays=[];render()" class="flex-1 py-2 border rounded-xl">취소</button><button onclick="saveStudent()" class="flex-1 py-2 bg-indigo-600 text-white rounded-xl">'+(s?'수정':'등록')+'</button></div>';
+  h+='</div></div></div>';
+  return h;
+}
+
+function renderDocModal(){
+  var d=currentDoc;var s=docStudentId?students.find(function(x){return x.id==docStudentId;}):null;
+  var content=getDocContent(d,s);
+  var h='<div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onclick="if(event.target===this){modal=\'\';currentDoc=null;render();}">';
+  h+='<div class="bg-white rounded-2xl w-full max-w-3xl max-h-[95vh] overflow-hidden flex flex-col">';
+  h+='<div class="p-4 border-b flex justify-between items-center bg-gray-50"><span class="font-bold">'+d.icon+' '+d.name+'</span><div class="flex gap-2"><button onclick="window.print()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm">🖨️ 인쇄</button><button onclick="modal=\'\';currentDoc=null;render()" class="px-4 py-2 bg-gray-200 rounded-xl">✕</button></div></div>';
+  h+='<div class="p-2 bg-amber-50 text-amber-800 text-sm text-center">💡 문서를 클릭하여 직접 편집할 수 있습니다</div>';
+  h+='<div class="flex-1 overflow-y-auto bg-gray-300 p-6"><div id="docContent" contenteditable="true" class="bg-white shadow-xl mx-auto cursor-text" style="width:210mm;min-height:297mm;padding:20mm;">'+content+'</div></div>';
+  h+='</div></div>';
+  return h;
+}
+
+function renderSmsModal(){
+  var selIds=Object.keys(selectedStudents).filter(function(k){return selectedStudents[k];});
+  var selStudents=selIds.map(function(id){return students.find(function(s){return s.id==id;});}).filter(Boolean);
+  var defaultMsg='['+academy.name+']\n\n안녕하세요. '+academy.name+'입니다.\n\n'+selStudents.map(function(s){return s.name;}).join(', ')+' 학생 출석 안내드립니다.\n\n감사합니다.';
+  
+  var h='<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick="if(event.target===this){modal=\'\';render();}">';
+  h+='<div class="bg-white rounded-2xl w-full max-w-md">';
+  h+='<div class="p-4 border-b flex justify-between"><span class="font-bold">📱 문자 보내기</span><button onclick="modal=\'\';render()">✕</button></div>';
+  h+='<div class="p-4">';
+  h+='<div class="mb-3"><span class="text-sm text-gray-500">받는 사람</span><div class="flex flex-wrap gap-1 mt-1">';
+  selStudents.forEach(function(s){h+='<span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-sm">'+s.name+'</span>';});
+  h+='</div></div>';
+  h+='<div class="mb-3"><span class="text-sm text-gray-500">내용</span><textarea id="smsContent" class="w-full p-3 border rounded-xl mt-1" rows="6">'+defaultMsg+'</textarea></div>';
+  h+='<button onclick="sendSMS()" class="w-full py-3 bg-blue-600 text-white rounded-xl font-bold">보내기</button>';
+  h+='</div></div></div>';
+  return h;
+}
+
+function getDocContent(doc,stu){
+  var s=stu||{name:'___________',course:'___________',level:'___',phone:'_______________',fee:0};var a=academy;
+  var header='<div style="border-bottom:2px solid #333;padding-bottom:15px;margin-bottom:30px;text-align:center;"><div style="font-size:16pt;font-weight:bold;">'+a.name+'</div><div style="font-size:9pt;color:#666;">'+a.address+' | Tel: '+a.phone+'</div></div>';
+  var footer='<div style="margin-top:80px;text-align:center;"><p>'+todayStr+'</p><p style="font-size:14pt;font-weight:bold;margin-top:30px;">'+a.name+'</p><p>원장 '+a.owner+' (인)</p></div>';
+  if(doc.name==='재원증명서')return header+'<h1 style="text-align:center;font-size:24pt;letter-spacing:10px;margin:50px 0;">재 원 증 명 서</h1><table style="width:100%;border-collapse:collapse;margin:30px 0;"><tr><td style="border:1px solid #333;padding:12px;width:25%;background:#f5f5f5;font-weight:bold;">성 명</td><td style="border:1px solid #333;padding:12px;">'+s.name+'</td></tr><tr><td style="border:1px solid #333;padding:12px;background:#f5f5f5;font-weight:bold;">수강과목</td><td style="border:1px solid #333;padding:12px;">'+s.course+'</td></tr><tr><td style="border:1px solid #333;padding:12px;background:#f5f5f5;font-weight:bold;">레 벨</td><td style="border:1px solid #333;padding:12px;">'+s.level+'</td></tr></table><div style="text-align:center;margin:60px 0;font-size:14pt;">위 학생은 본 학원에 재원 중임을 증명합니다.</div>'+footer;
+  if(doc.name==='수강료영수증')return header+'<h1 style="text-align:center;font-size:24pt;letter-spacing:10px;margin:50px 0;">영 수 증</h1><div style="text-align:center;margin:40px 0;padding:30px;border:3px solid #333;"><p>금 액</p><p style="font-size:28pt;font-weight:bold;color:#c00;">'+(s.fee||0).toLocaleString()+'원</p></div><table style="width:100%;border-collapse:collapse;"><tr><td style="border:1px solid #333;padding:12px;width:25%;background:#f5f5f5;">내 용</td><td style="border:1px solid #333;padding:12px;">'+s.course+' 수강료</td></tr><tr><td style="border:1px solid #333;padding:12px;background:#f5f5f5;">원 생</td><td style="border:1px solid #333;padding:12px;">'+s.name+'</td></tr></table><p style="text-align:center;margin:50px 0;">위 금액을 정히 영수함.</p>'+footer;
+  return header+'<h1 style="text-align:center;font-size:22pt;margin:50px 0;">'+doc.name+'</h1><p style="text-align:center;color:#666;margin:30px 0;">내용을 입력하세요.</p>'+footer;
+}
+
+// 함수들
+function toggleDay(d){var i=selectedDays.indexOf(d);if(i>=0)selectedDays.splice(i,1);else selectedDays.push(d);render();}
+function saveStudent(){var name=document.getElementById('sName').value,phone=document.getElementById('sPhone').value;if(!name||!phone){alert('이름과 연락처 필수');return;}if(!selectedDays.length){alert('수업요일 선택');return;}var data={name:name,phone:phone,pPhone:document.getElementById('sPPhone').value||phone,course:document.getElementById('sCourse').value,level:document.getElementById('sLevel').value,fee:parseInt(document.getElementById('sFee').value)||200000,paid:document.getElementById('sPaid').checked,paidDate:todayDate.toISOString().split('T')[0],days:selectedDays.slice(),time:document.getElementById('sTime').value,hw:[],memo:'',attHistory:[]};if(editingId){for(var i=0;i<students.length;i++){if(students[i].id===editingId){data.hw=students[i].hw;data.memo=students[i].memo;data.attHistory=students[i].attHistory;students[i]=Object.assign({id:editingId},data);break;}}}else{data.id=Math.max.apply(null,students.map(function(s){return s.id;}))+1;students.push(data);}modal='';editingId=null;selectedDays=[];render();}
+function editStudent(id){editingId=id;selectedDays=[];modal='addStudent';render();}
+function toggleAtt(id){attendance[id]=!attendance[id];render();}
+function toggleSelect(id){selectedStudents[id]=!selectedStudents[id];render();}
+function markPaid(id){for(var i=0;i<students.length;i++){if(students[i].id===id){students[i].paid=true;students[i].paidDate=todayDate.toISOString().split('T')[0];break;}}render();}
+function saveMemo(id){var memo=document.getElementById('studentMemo').value;for(var i=0;i<students.length;i++){if(students[i].id===id){students[i].memo=memo;break;}}alert('저장되었습니다');}
+function addTodo(){var t=prompt('할 일:');if(!t)return;todos.push({id:Date.now(),text:t,done:false});render();}
+function toggleTodo(id){for(var i=0;i<todos.length;i++){if(todos[i].id===id){todos[i].done=!todos[i].done;break;}}render();}
+function deleteTodo(id){todos=todos.filter(function(t){return t.id!==id;});render();}
+function addNotice(){var t=prompt('공지 제목:');if(!t)return;notices.unshift({id:Date.now(),title:t,content:prompt('내용:')||'',date:todayStr});render();}
+function deleteNotice(id){if(confirm('삭제?')){notices=notices.filter(function(n){return n.id!==id;});render();}}
+function sendReply(id){var el=document.getElementById('reply'+id);if(!el||!el.value)return;for(var i=0;i<consults.length;i++){if(consults[i].id===id){consults[i].reply=el.value;consults[i].status='완료';break;}}render();}
+function addHomework(sid){var t=prompt('과제:');if(!t)return;for(var i=0;i<students.length;i++){if(students[i].id===sid){students[i].hw=students[i].hw||[];students[i].hw.push({id:Date.now(),t:t,done:false});break;}}render();}
+function openDoc(id){currentDoc=docs.find(function(d){return d.id===id;});modal='docPreview';render();}
+function openSmsModal(){var sel=Object.keys(selectedStudents).filter(function(k){return selectedStudents[k];});if(!sel.length){alert('학생을 선택하세요');return;}modal='sms';render();}
+function sendSMS(){var content=document.getElementById('smsContent').value;alert('문자 발송 완료!\n\n(데모에서는 실제 발송되지 않습니다)\n\n'+content);modal='';selectedStudents={};render();}
+function downloadExcel(){var data=students.map(function(s){return{이름:s.name,연락처:s.phone,과목:s.course,레벨:s.level,수강료:s.fee,납부:s.paid?'완료':'미납',수업요일:s.days.join(','),수업시간:s.time};});var ws=XLSX.utils.json_to_sheet(data);var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'원생');XLSX.writeFile(wb,'원생목록.xlsx');}
+
+render();
+</script>
+</body>
+</html>
