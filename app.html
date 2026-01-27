@@ -54,8 +54,8 @@ function getStudentsByDay(day){
     if(s.schedule && typeof s.schedule === 'object') return s.schedule[day];
     return s.days && s.days.includes(day);
   }).sort((a,b)=>{
-    const tA = s.schedule?.[day] || s.time || '';
-    const tB = s.schedule?.[day] || s.time || '';
+    const tA = a.schedule?.[day] || a.time || '';
+    const tB = b.schedule?.[day] || b.time || '';
     return tA.localeCompare(tB);
   });
 }
