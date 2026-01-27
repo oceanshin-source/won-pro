@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>원생관리 Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    *{font-family:-apple-system,'Malgun Gothic',sans-serif;box-sizing:border-box}
+    .sidebar-item.active{background:rgba(99,102,241,.15);color:#4f46e5;border-right:3px solid #4f46e5}
+  </style>
+</head>
+<body class="bg-gray-100">
+<div id="app"></div>
+<script>
+// Supabase 설정
+const SUPABASE_URL = 'https://sniabexwdgeepakkxxek.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_PTz13bW3L6MMSlBmCsACLQ_tm-c-FMi';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// 상태
+let page = 'login';
+let academy = null;
+let admin = null;
+let students = [];
+let notices = [];
+let consults = [];
+let todos = [];
+let attendance = {};
+let tab = 'dashboard';
+let modal = '';
+let editingId = null;
+let selectedDays = [];
+let selectedStudents = {};
+let attTab = 'today';
+let viewStudentId = null;
+let loading = false;
+
+const dayList = ['일','월','화','수','목','금','토'];
+const today = dayList[new Date().getDay()];
+const yesterday = dayList[(new Date().getDay()+6)%7];
+const tomorrow = dayList[(new Date().getDay()+1)%7];
+const todayStr = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
+const todayISO = new Date().toISOString().split('T')[0];
+
+// 유틸
+function fmt(n){return n>=10000?(n/10000).toFixed(0)+'만':n.toLocaleString();}
+function getStudentsByDay(day){return students.filter(s=>s.days&&s.days.includes(day)).sort((a,b)=>(a.time||'').localeCompare(b.time||''));}
+
+// 렌더
+function render(){
+  const app = document.getElementById('app');
+  if(loading){app.innerHTML='<div class="min-h-screen flex items-center justify-center"><div class="text-center"><div class="text-4xl mb-4">⏳</div><p>로딩중...</p></div></div>';return;}
+  if(page==='login') app.innerHTML = renderLogin();
+  else if(page==='register') app.innerHTML = renderRegister();
+  else if(page==='main') app.innerHTML = renderMain();
+}
+
+// 로그인 페이지
+function renderLogin(){
+  return `
+  <div class="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+      <div class="text-center mb-8">
+        <div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-4 text-4xl">📚</div>
+        <h1 class="text-3xl font-bold text-white">원생관리 Pro</h1>
+        <p class="text-indigo-200 mt-2">학원 관리의 새로운 시작</p>
+      </div>
+      
+      <div class="bg-white rounded-2xl p-6 shadow-xl">
+        <h2 class="text-xl font-bold mb-4">로그인</h2>
+        <input type="email" id="loginEmail" placeholder="이메일" class="w-full px-4 py-3 border rounded-xl mb-3">
+        <input type="password" id="loginPw" placeholder="비밀번호" class="w-full px-4 py-3 border rounded-xl mb-4">
+        <button onclick="doLogin()" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700">로그인</button>
+        <p class="text-center mt-4 text-gray-500">계정이 없으신가요? <button onclick="page='register';render()" class="text-indigo-600 font-medium">회원가입</button></p>
+      </div>
+    </div>
+  </div>`;
+}
+
+// 회원가입 페이지
+function renderRegister(){
+  return `
+  <div class="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+      <div class="text-center mb-8">
+        <div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-4 text-4xl">📚</div>
+        <h1 class="text-3xl font-bold text-white">원생관리 Pro</h1>
+      </div>
+      
+      <div class="bg-white rounded-2xl p-6 shadow-xl">
+        <h2 class="text-xl font-bold mb-4">회원가입</h2>
+        <input type="text" id="regAcademy" placeholder="학원명 *" class="w-full px-4 py-3 border rounded-xl mb-3">
+        <input type="text" id="regOwner" placeholder="원장님 성함 *" class="w-full px-4 py-3 border rounded-xl mb-3">
+        <input type="tel" id="regPhone" placeholder="연락처" class="w-full px-4 py-3 border rounded-xl mb-3">
+        <input type="text" id="regAddress" placeholder="주소" class="w-full px-4 py-3 border rounded-xl mb-3">
+        <input type="email" id="regEmail" placeholder="이메일 (로그인용) *" class="w-full px-4 py-3 border rounded-xl mb-3">
+        <input type="password" id="regPw" placeholder="비밀번호 *" class="w-full px-4 py-3 border rounded-xl mb-4">
+        <button onclick="doRegister()" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700">가입하기</button>
+        <p class="text-center mt-4 text-gray-500">이미 계정이 있으신가요? <button onclick="page='login';render()" class="text-indigo-600 font-medium">로그인</button></p>
+      </div>
+    </div>
+  </div>`;
+}
+
+// 회원가입 처리
+async function doRegister(){
+  const name = document.getElementById('regAcademy').value;
+  const owner = document.getElementById('regOwner').value;
+  const phone = document.getElementById('regPhone').value;
+  const address = document.getElementById('regAddress').value;
+  const email = document.getElementById('regEmail').value;
+  const pw = document.getElementById('regPw').value;
+  
+  if(!name||!owner||!email||!pw){alert('필수 항목을 입력하세요');return;}
+  
+  loading=true;render();
+  
+  // 학원 생성
+  const {data:academyData,error:err1} = await supabase.from('academies').insert({name,owner,phone,address}).select().single();
+  if(err1){alert('학원 등록 실패: '+err1.message);loading=false;render();return;}
+  
+  // 관리자 생성
+  const {data:adminData,error:err2} = await supabase.from('admins').insert({academy_id:academyData.id,email,password:pw}).select().single();
+  if(err2){alert('관리자 등록 실패: '+err2.message);loading=false;render();return;}
+  
+  alert('가입 완료! 로그인하세요.');
+  loading=false;
+  page='login';
+  render();
+}
+
+// 로그인 처리
+async function doLogin(){
+  const email = document.getElementById('loginEmail').value;
+  const pw = document.getElementById('loginPw').value;
+  
+  if(!email||!pw){alert('이메일과 비밀번호를 입력하세요');return;}
+  
+  loading=true;render();
+  
+  const {data,error} = await supabase.from('admins').select('*,academies(*)').eq('email',email).eq('password',pw).single();
+  
+  if(error||!data){alert('로그인 실패: 이메일 또는 비밀번호 확인');loading=false;render();return;}
+  
+  admin = data;
+  academy = data.academies;
+  
+  // 데이터 로드
+  await loadData();
+  
+  loading=false;
+  page='main';
+  render();
+}
+
+// 데이터 로드
+async function loadData(){
+  const {data:s} = await supabase.from('students').select('*').eq('academy_id',academy.id);
+  students = s || [];
+  
+  const {data:n} = await supabase.from('notices').select('*').eq('academy_id',academy.id).order('created_at',{ascending:false});
+  notices = n || [];
+  
+  const {data:c} = await supabase.from('consults').select('*,students(name)').eq('students.academy_id',academy.id);
+  consults = c || [];
+  
+  const {data:t} = await supabase.from('todos').select('*').eq('academy_id',academy.id);
+  todos = t || [];
+  
+  // 오늘 출석
+  const {data:a} = await supabase.from('attendance').select('*').eq('date',todayISO);
+  attendance = {};
+  (a||[]).forEach(att=>{attendance[att.student_id]=att.status;});
+}
+
+// 로그아웃
+function logout(){
+  admin=null;academy=null;students=[];notices=[];consults=[];todos=[];attendance={};
+  page='login';render();
+}
+
+// 메인
+function renderMain(){
+  const todayS = getStudentsByDay(today);
+  const tomorrowS = getStudentsByDay(tomorrow);
+  const unpaid = students.filter(s=>!s.paid);
+  const revenue = students.filter(s=>s.paid).reduce((a,s)=>a+(s.fee||0),0);
+  const pending = consults.filter(c=>c.status==='대기');
+
+  const menus = [
+    {id:'dashboard',icon:'📊',label:'대시보드'},
+    {id:'students',icon:'👥',label:'원생관리'},
+    {id:'attendance',icon:'📅',label:'출결관리'},
+    {id:'payments',icon:'💰',label:'수강료'},
+    {id:'notices',icon:'📢',label:'공지사항'},
+    {id:'consult',icon:'💬',label:'상담',badge:pending.length},
+    {id:'settings',icon:'⚙️',label:'설정'}
+  ];
+
+  let h = '<div class="flex min-h-screen">';
+  
+  // 사이드바
+  h += `<aside class="hidden lg:flex w-64 bg-white border-r flex-col fixed h-full">
+    <div class="p-4 border-b"><div class="flex items-center gap-3"><span class="text-2xl">📚</span><div><div class="font-bold">${academy.name}</div><div class="text-xs text-gray-400">${academy.owner}</div></div></div></div>
+    <nav class="flex-1 py-2">`;
+  menus.forEach(m=>{
+    const cls = tab===m.id ? 'active bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50';
+    const badge = m.badge ? `<span class="ml-auto bg-red-500 text-white text-xs px-2 rounded-full">${m.badge}</span>` : '';
+    h += `<button onclick="tab='${m.id}';viewStudentId=null;render()" class="sidebar-item w-full px-4 py-3 flex items-center gap-3 text-left ${cls}">${m.icon} ${m.label}${badge}</button>`;
+  });
+  h += `</nav><div class="p-4 border-t"><button onclick="logout()" class="text-gray-500 text-sm">로그아웃</button></div></aside>`;
+
+  // 메인
+  h += '<main class="flex-1 lg:ml-64">';
+  
+  // 헤더
+  h += `<header class="bg-white border-b sticky top-0 z-10">
+    <div class="px-4 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-2 lg:hidden"><span>📚</span><span class="font-bold">${academy.name}</span></div>
+      <div class="hidden lg:block font-bold">${menus.find(m=>m.id===tab)?.label||''}</div>
+      <div class="flex gap-2">
+        <button onclick="modal='addStudent';editingId=null;selectedDays=[];render()" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg">+원생</button>
+        <button onclick="logout()" class="lg:hidden text-gray-500 text-sm">로그아웃</button>
+      </div>
+    </div>
+    <div class="lg:hidden flex border-t overflow-x-auto">`;
+  menus.slice(0,5).forEach(m=>{
+    h += `<button onclick="tab='${m.id}';render()" class="px-4 py-2 text-sm whitespace-nowrap border-b-2 ${tab===m.id?'border-indigo-600 text-indigo-600':'border-transparent text-gray-500'}">${m.icon}</button>`;
+  });
+  h += '</div></header>';
+
+  h += '<div class="p-4 lg:p-6">';
+
+  // 대시보드
+  if(tab==='dashboard'){
+    h += `<div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-6 text-white mb-6">
+      <p class="text-indigo-100">${todayStr} ${today}요일</p>
+      <h2 class="text-2xl font-bold mt-1">안녕하세요, ${academy.owner} 원장님!</h2>
+    </div>`;
+
+    h += `<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white rounded-2xl p-5 border"><p class="text-gray-500 text-sm">전체원생</p><p class="text-3xl font-bold">${students.length}<span class="text-lg text-gray-400">명</span></p></div>
+      <div class="bg-white rounded-2xl p-5 border"><p class="text-gray-500 text-sm">이번달 매출</p><p class="text-3xl font-bold text-emerald-600">${fmt(revenue)}</p></div>
+      <div class="bg-white rounded-2xl p-5 border"><p class="text-gray-500 text-sm">오늘수업</p><p class="text-3xl font-bold text-blue-600">${todayS.length}<span class="text-lg text-gray-400">명</span></p></div>
+      <div class="bg-white rounded-2xl p-5 border cursor-pointer" onclick="tab='payments';render()"><p class="text-gray-500 text-sm">미납</p><p class="text-3xl font-bold text-red-600">${unpaid.length}<span class="text-lg text-gray-400">명</span></p></div>
+    </div>`;
+
+    h += '<div class="grid lg:grid-cols-3 gap-6">';
+    
+    // 오늘/내일 수업
+    h += '<div class="lg:col-span-2 space-y-4">';
+    h += `<div class="bg-white rounded-2xl border p-5">
+      <div class="flex justify-between items-center mb-4"><h3 class="font-bold">📅 오늘 수업 (${today})</h3><span class="text-indigo-600 font-bold">${todayS.length}명</span></div>`;
+    if(todayS.length){
+      h += '<div class="space-y-2">';
+      todayS.forEach(s=>{
+        const checked = attendance[s.id];
+        h += `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+          <div class="flex items-center gap-3"><span class="text-lg font-bold text-indigo-600">${s.time||'-'}</span><div><div class="font-medium">${s.name}</div><div class="text-xs text-gray-500">${s.course||''}</div></div></div>
+          <span class="text-sm ${checked?'text-emerald-600':'text-gray-400'}">${checked?'✓출석':'대기'}</span>
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<p class="text-gray-400 text-center py-4">오늘 수업 없음</p>';
+    }
+    h += `<button onclick="tab='attendance';render()" class="w-full mt-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm">출석체크 →</button></div>`;
+
+    // 내일
+    h += `<div class="bg-white rounded-2xl border p-5">
+      <div class="flex justify-between items-center mb-4"><h3 class="font-bold">📆 내일 수업 (${tomorrow})</h3><span class="text-purple-600 font-bold">${tomorrowS.length}명</span></div>`;
+    if(tomorrowS.length){
+      h += '<div class="space-y-2">';
+      tomorrowS.slice(0,4).forEach(s=>{
+        h += `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+          <div class="flex items-center gap-3"><span class="text-lg font-bold text-purple-600">${s.time||'-'}</span><div><div class="font-medium">${s.name}</div><div class="text-xs text-gray-500">${s.course||''}</div></div></div>
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<p class="text-gray-400 text-center py-4">내일 수업 없음</p>';
+    }
+    h += '</div></div>';
+
+    // 사이드
+    h += '<div class="space-y-4">';
+    
+    // 할일
+    h += `<div class="bg-white rounded-2xl border p-5">
+      <div class="flex justify-between items-center mb-3"><h3 class="font-bold">📋 오늘 할 일</h3><button onclick="addTodo()" class="text-indigo-600 text-sm">+추가</button></div>
+      <div class="space-y-2 text-sm">`;
+    todos.forEach(t=>{
+      h += `<div class="flex items-center gap-2 p-2 rounded-lg ${t.urgent&&!t.done?'bg-red-50':'bg-gray-50'}">
+        <input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo('${t.id}')" class="w-4 h-4">
+        <span class="flex-1 ${t.done?'line-through text-gray-400':''}">${t.text}</span>
+        <button onclick="deleteTodo('${t.id}')" class="text-gray-400 hover:text-red-500">✕</button>
+      </div>`;
+    });
+    if(!todos.length) h += '<p class="text-gray-400 text-center py-2">할 일 없음</p>';
+    h += '</div></div>';
+
+    // 미납
+    h += `<div class="bg-white rounded-2xl border p-5">
+      <div class="flex justify-between items-center mb-3"><h3 class="font-bold">💸 미납</h3><span class="text-red-600 font-medium">${fmt(unpaid.reduce((a,s)=>a+(s.fee||0),0))}</span></div>`;
+    unpaid.slice(0,3).forEach(s=>{
+      h += `<div class="flex justify-between py-2 border-b last:border-0"><span>${s.name}</span><span class="text-red-600">${fmt(s.fee||0)}</span></div>`;
+    });
+    if(!unpaid.length) h += '<p class="text-gray-400 text-center py-2">미납 없음 🎉</p>';
+    h += '</div></div></div>';
+  }
+
+  // 원생관리
+  else if(tab==='students'){
+    h += `<div class="flex justify-between items-center mb-4">
+      <input type="text" placeholder="검색..." class="px-4 py-2 border rounded-xl w-64">
+      <button onclick="downloadExcel()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm">📥 엑셀</button>
+    </div>`;
+    
+    h += '<div class="bg-white rounded-2xl border overflow-hidden">';
+    h += `<table class="w-full"><thead><tr class="bg-gray-50 border-b">
+      <th class="text-left px-4 py-3 text-sm">원생</th>
+      <th class="text-left px-4 py-3 text-sm">과목</th>
+      <th class="text-left px-4 py-3 text-sm hidden md:table-cell">수업일정</th>
+      <th class="text-right px-4 py-3 text-sm">수강료</th>
+    </tr></thead><tbody>`;
+    students.forEach(s=>{
+      h += `<tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="viewStudent('${s.id}')">
+        <td class="px-4 py-3"><div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">${s.name?.[0]||'?'}</div>
+          <div><div class="font-medium">${s.name}</div><div class="text-xs text-gray-500">${s.phone||''}</div></div>
+        </div></td>
+        <td class="px-4 py-3"><span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-sm">${s.course||'-'}</span></td>
+        <td class="px-4 py-3 text-sm hidden md:table-cell">${(s.days||[]).join(' ')} ${s.time||''}</td>
+        <td class="px-4 py-3 text-right"><div class="font-medium">${fmt(s.fee||0)}</div><div class="text-xs ${s.paid?'text-emerald-600':'text-red-500'}">${s.paid?'완료':'미납'}</div></td>
+      </tr>`;
+    });
+    if(!students.length) h += '<tr><td colspan="4" class="text-center py-8 text-gray-400">원생을 등록하세요</td></tr>';
+    h += '</tbody></table></div>';
+  }
+
+  // 출결관리
+  else if(tab==='attendance'){
+    const list = attTab==='yesterday'?getStudentsByDay(yesterday):attTab==='tomorrow'?getStudentsByDay(tomorrow):getStudentsByDay(today);
+    const selCount = Object.keys(selectedStudents).filter(k=>selectedStudents[k]).length;
+
+    h += `<div class="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-6 text-white mb-6">
+      <div class="flex justify-between items-center"><div><h3 class="text-xl font-bold">📱 출결 관리</h3></div>
+      <div class="text-right"><div class="text-3xl font-bold">${Object.keys(attendance).filter(k=>attendance[k]).length}/${getStudentsByDay(today).length}</div><div class="text-emerald-100">오늘 출석</div></div></div></div>`;
+
+    h += `<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+      <div class="flex gap-2">
+        <button onclick="attTab='yesterday';render()" class="px-4 py-2 rounded-xl ${attTab==='yesterday'?'bg-indigo-600 text-white':'bg-white border'}">어제 (${yesterday})</button>
+        <button onclick="attTab='today';render()" class="px-4 py-2 rounded-xl ${attTab==='today'?'bg-indigo-600 text-white':'bg-white border'}">오늘 (${today})</button>
+        <button onclick="attTab='tomorrow';render()" class="px-4 py-2 rounded-xl ${attTab==='tomorrow'?'bg-indigo-600 text-white':'bg-white border'}">내일 (${tomorrow})</button>
+      </div>
+      <button onclick="openSmsModal()" class="px-4 py-2 bg-blue-600 text-white rounded-xl ${selCount===0?'opacity-50':''}">📱 문자보내기 (${selCount})</button>
+    </div>`;
+
+    h += '<div class="bg-white rounded-2xl border p-4">';
+    if(list.length){
+      h += '<div class="space-y-2">';
+      list.forEach(s=>{
+        const checked = attTab==='today' && attendance[s.id];
+        const selected = selectedStudents[s.id];
+        h += `<div class="flex items-center gap-3 p-4 rounded-xl border-2 ${checked?'border-emerald-500 bg-emerald-50':'border-gray-200'}">
+          <input type="checkbox" ${selected?'checked':''} onchange="toggleSelect('${s.id}')" class="w-5 h-5">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center font-bold cursor-pointer ${checked?'bg-emerald-500 text-white':'bg-gray-100'}" onclick="${attTab==='today'?`toggleAtt('${s.id}')`:''}">
+            ${checked?'✓':s.name?.[0]||'?'}
+          </div>
+          <div class="flex-1"><div class="font-medium">${s.name}</div><div class="text-sm text-gray-500">${s.course||''} · ${s.time||''}</div></div>
+          <div class="text-sm ${checked?'text-emerald-600':'text-gray-400'}">${checked?'출석':'대기'}</div>
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<p class="text-center text-gray-400 py-8">수업 없음</p>';
+    }
+    h += '</div>';
+  }
+
+  // 수강료
+  else if(tab==='payments'){
+    const total = students.reduce((a,s)=>a+(s.fee||0),0);
+    const paidAmt = students.filter(s=>s.paid).reduce((a,s)=>a+(s.fee||0),0);
+    const unpaidList = students.filter(s=>!s.paid);
+
+    h += `<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white rounded-2xl p-5 border"><div class="text-sm text-gray-500">예상매출</div><div class="text-2xl font-bold">${fmt(total)}</div></div>
+      <div class="bg-white rounded-2xl p-5 border"><div class="text-sm text-gray-500">수납완료</div><div class="text-2xl font-bold text-emerald-600">${fmt(paidAmt)}</div></div>
+      <div class="bg-white rounded-2xl p-5 border"><div class="text-sm text-gray-500">미수금</div><div class="text-2xl font-bold text-red-600">${fmt(total-paidAmt)}</div></div>
+      <div class="bg-white rounded-2xl p-5 border"><div class="text-sm text-gray-500">수납률</div><div class="text-2xl font-bold text-indigo-600">${total?Math.round(paidAmt/total*100):0}%</div></div>
+    </div>`;
+
+    h += '<div class="bg-white rounded-2xl border">';
+    h += `<div class="px-4 py-3 border-b flex justify-between"><span class="font-bold">미납 원생</span><span class="text-red-600">${unpaidList.length}명</span></div>`;
+    unpaidList.forEach(s=>{
+      h += `<div class="flex items-center justify-between px-4 py-3 border-b">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-red-100 text-red-600 rounded-full flex items-center justify-center">${s.name?.[0]||'?'}</div>
+          <div><div class="font-medium">${s.name}</div><div class="text-xs text-gray-500">${s.course||''}</div></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="font-bold">${fmt(s.fee||0)}</span>
+          <button onclick="markPaid('${s.id}')" class="px-3 py-1 bg-emerald-600 text-white text-sm rounded-lg">수납</button>
+        </div>
+      </div>`;
+    });
+    if(!unpaidList.length) h += '<p class="text-center text-gray-400 py-8">🎉 미납 없음</p>';
+    h += '</div>';
+  }
+
+  // 공지사항
+  else if(tab==='notices'){
+    h += `<div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">📢 공지사항</h2><button onclick="addNotice()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm">+ 새 공지</button></div>`;
+    notices.forEach(n=>{
+      h += `<div class="bg-white rounded-2xl border p-5 mb-3">
+        <div class="flex justify-between"><h3 class="font-bold">${n.title}</h3><button onclick="deleteNotice('${n.id}')" class="text-gray-400">✕</button></div>
+        <p class="text-sm text-gray-500 mt-1">${new Date(n.created_at).toLocaleDateString('ko-KR')}</p>
+        <p class="mt-2">${n.content||''}</p>
+      </div>`;
+    });
+    if(!notices.length) h += '<p class="text-gray-400 text-center py-8">공지사항 없음</p>';
+  }
+
+  // 상담
+  else if(tab==='consult'){
+    h += '<h2 class="text-xl font-bold mb-4">💬 상담 관리</h2>';
+    consults.forEach(c=>{
+      h += `<div class="bg-white rounded-2xl border p-5 mb-3 ${c.status==='대기'?'border-l-4 border-l-red-500':''}">
+        <div class="flex justify-between mb-2"><span class="font-medium">${c.students?.name||''}</span><span class="text-xs px-2 py-1 rounded-full ${c.status==='대기'?'bg-red-100 text-red-600':'bg-emerald-100 text-emerald-600'}">${c.status}</span></div>
+        <div class="p-3 bg-gray-50 rounded-xl mb-3">${c.message||''}</div>
+        ${c.reply?`<div class="p-3 bg-indigo-50 rounded-xl"><span class="text-xs text-indigo-600">답변</span><p class="mt-1">${c.reply}</p></div>`:`<textarea id="reply${c.id}" class="w-full p-3 border rounded-xl mb-2" placeholder="답변 입력"></textarea><button onclick="sendReply('${c.id}')" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm">답변</button>`}
+      </div>`;
+    });
+    if(!consults.length) h += '<p class="text-gray-400 text-center py-8">상담 없음</p>';
+  }
+
+  // 설정
+  else if(tab==='settings'){
+    h += `<div class="bg-white rounded-2xl border p-6 mb-4">
+      <h2 class="font-bold mb-4">🏫 학원 정보</h2>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div><label class="text-sm text-gray-600">학원명</label><input type="text" id="setName" value="${academy.name||''}" class="w-full px-4 py-2 border rounded-xl mt-1"></div>
+        <div><label class="text-sm text-gray-600">원장명</label><input type="text" id="setOwner" value="${academy.owner||''}" class="w-full px-4 py-2 border rounded-xl mt-1"></div>
+        <div class="md:col-span-2"><label class="text-sm text-gray-600">주소</label><input type="text" id="setAddress" value="${academy.address||''}" class="w-full px-4 py-2 border rounded-xl mt-1"></div>
+        <div><label class="text-sm text-gray-600">연락처</label><input type="text" id="setPhone" value="${academy.phone||''}" class="w-full px-4 py-2 border rounded-xl mt-1"></div>
+      </div>
+      <button onclick="saveSettings()" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl">저장</button>
+    </div>`;
+  }
+
+  h += '</div></main></div>';
+
+  // 모달
+  if(modal==='addStudent') h += renderStudentModal();
+  if(modal==='sms') h += renderSmsModal();
+
+  return h;
+}
+
+// 원생 모달
+function renderStudentModal(){
+  const s = editingId ? students.find(x=>x.id===editingId) : null;
+  if(s && !selectedDays.length) selectedDays = s.days || [];
+  
+  let h = `<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick="if(event.target===this){modal='';editingId=null;selectedDays=[];render();}">
+    <div class="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between"><span class="font-bold">${s?'원생 수정':'원생 등록'}</span><button onclick="modal='';editingId=null;selectedDays=[];render()">✕</button></div>
+      <div class="p-4 space-y-3">
+        <input type="text" id="sName" value="${s?.name||''}" class="w-full px-4 py-2 border rounded-xl" placeholder="이름 *">
+        <input type="tel" id="sPhone" value="${s?.phone||''}" class="w-full px-4 py-2 border rounded-xl" placeholder="연락처 *">
+        <input type="tel" id="sPPhone" value="${s?.parent_phone||''}" class="w-full px-4 py-2 border rounded-xl" placeholder="학부모 연락처">
+        <div class="grid grid-cols-2 gap-2">
+          <input type="text" id="sCourse" value="${s?.course||''}" class="px-4 py-2 border rounded-xl" placeholder="과목">
+          <input type="text" id="sLevel" value="${s?.level||''}" class="px-4 py-2 border rounded-xl" placeholder="레벨">
+        </div>
+        <div class="bg-indigo-50 rounded-xl p-3">
+          <div class="text-sm font-medium mb-2">수업 요일</div>
+          <div class="flex gap-1">`;
+  ['월','화','수','목','금','토','일'].forEach(d=>{
+    const sel = selectedDays.includes(d);
+    h += `<button type="button" onclick="toggleDay('${d}')" class="flex-1 py-2 rounded text-sm ${sel?'bg-indigo-600 text-white':'bg-white border'}">${d}</button>`;
+  });
+  h += `</div>
+          <input type="time" id="sTime" value="${s?.time||'16:00'}" class="w-full px-4 py-2 border rounded-xl mt-2">
+        </div>
+        <input type="number" id="sFee" value="${s?.fee||200000}" class="w-full px-4 py-2 border rounded-xl" placeholder="수강료">
+        <label class="flex items-center gap-2"><input type="checkbox" id="sPaid" ${s?.paid?'checked':''} class="w-5 h-5">납부완료</label>
+        <div class="flex gap-2">
+          <button onclick="modal='';editingId=null;selectedDays=[];render()" class="flex-1 py-2 border rounded-xl">취소</button>
+          <button onclick="saveStudent()" class="flex-1 py-2 bg-indigo-600 text-white rounded-xl">${s?'수정':'등록'}</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  return h;
+}
+
+// SMS 모달
+function renderSmsModal(){
+  const selIds = Object.keys(selectedStudents).filter(k=>selectedStudents[k]);
+  const selStudents = selIds.map(id=>students.find(s=>s.id===id)).filter(Boolean);
+  const defaultMsg = `[${academy.name}]\n\n안녕하세요.\n\n${selStudents.map(s=>s.name).join(', ')} 학생 출석 안내드립니다.`;
+  
+  return `<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick="if(event.target===this){modal='';render();}">
+    <div class="bg-white rounded-2xl w-full max-w-md">
+      <div class="p-4 border-b flex justify-between"><span class="font-bold">📱 문자 보내기</span><button onclick="modal='';render()">✕</button></div>
+      <div class="p-4">
+        <div class="mb-3"><span class="text-sm text-gray-500">받는 사람</span>
+          <div class="flex flex-wrap gap-1 mt-1">${selStudents.map(s=>`<span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-sm">${s.name}</span>`).join('')}</div>
+        </div>
+        <div class="mb-3"><span class="text-sm text-gray-500">내용</span><textarea id="smsContent" class="w-full p-3 border rounded-xl mt-1" rows="6">${defaultMsg}</textarea></div>
+        <button onclick="sendSMS()" class="w-full py-3 bg-blue-600 text-white rounded-xl font-bold">보내기</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// 함수들
+function toggleDay(d){
+  const i = selectedDays.indexOf(d);
+  if(i>=0) selectedDays.splice(i,1);
+  else selectedDays.push(d);
+  render();
+}
+
+async function saveStudent(){
+  const name = document.getElementById('sName').value;
+  const phone = document.getElementById('sPhone').value;
+  if(!name){alert('이름을 입력하세요');return;}
+  
+  const data = {
+    academy_id: academy.id,
+    name,
+    phone,
+    parent_phone: document.getElementById('sPPhone').value,
+    course: document.getElementById('sCourse').value,
+    level: document.getElementById('sLevel').value,
+    fee: parseInt(document.getElementById('sFee').value)||0,
+    paid: document.getElementById('sPaid').checked,
+    days: selectedDays,
+    time: document.getElementById('sTime').value
+  };
+  
+  loading=true;render();
+  
+  if(editingId){
+    await supabase.from('students').update(data).eq('id',editingId);
+  } else {
+    await supabase.from('students').insert(data);
+  }
+  
+  await loadData();
+  modal='';editingId=null;selectedDays=[];
+  loading=false;render();
+}
+
+function viewStudent(id){
+  viewStudentId=id;
+  editingId=id;
+  selectedDays=[];
+  modal='addStudent';
+  render();
+}
+
+async function toggleAtt(id){
+  const exists = attendance[id];
+  if(exists){
+    await supabase.from('attendance').delete().eq('student_id',id).eq('date',todayISO);
+    delete attendance[id];
+  } else {
+    await supabase.from('attendance').insert({student_id:id,date:todayISO,status:'출석'});
+    attendance[id]='출석';
+  }
+  render();
+}
+
+function toggleSelect(id){selectedStudents[id]=!selectedStudents[id];render();}
+
+async function markPaid(id){
+  await supabase.from('students').update({paid:true,paid_date:todayISO}).eq('id',id);
+  await loadData();
+  render();
+}
+
+async function addTodo(){
+  const text=prompt('할 일:');
+  if(!text)return;
+  await supabase.from('todos').insert({academy_id:academy.id,text});
+  await loadData();
+  render();
+}
+
+async function toggleTodo(id){
+  const t=todos.find(x=>x.id===id);
+  if(t){
+    await supabase.from('todos').update({done:!t.done}).eq('id',id);
+    await loadData();
+    render();
+  }
+}
+
+async function deleteTodo(id){
+  await supabase.from('todos').delete().eq('id',id);
+  await loadData();
+  render();
+}
+
+async function addNotice(){
+  const title=prompt('공지 제목:');
+  if(!title)return;
+  const content=prompt('내용:')||'';
+  await supabase.from('notices').insert({academy_id:academy.id,title,content});
+  await loadData();
+  render();
+}
+
+async function deleteNotice(id){
+  if(confirm('삭제?')){
+    await supabase.from('notices').delete().eq('id',id);
+    await loadData();
+    render();
+  }
+}
+
+async function sendReply(id){
+  const el=document.getElementById('reply'+id);
+  if(!el||!el.value)return;
+  await supabase.from('consults').update({reply:el.value,status:'완료'}).eq('id',id);
+  await loadData();
+  render();
+}
+
+function openSmsModal(){
+  const sel=Object.keys(selectedStudents).filter(k=>selectedStudents[k]);
+  if(!sel.length){alert('학생을 선택하세요');return;}
+  modal='sms';render();
+}
+
+function sendSMS(){
+  const content=document.getElementById('smsContent').value;
+  alert('문자 발송!\n(실제 발송은 Aligo 연동 필요)\n\n'+content);
+  modal='';selectedStudents={};render();
+}
+
+async function saveSettings(){
+  const data = {
+    name: document.getElementById('setName').value,
+    owner: document.getElementById('setOwner').value,
+    address: document.getElementById('setAddress').value,
+    phone: document.getElementById('setPhone').value
+  };
+  await supabase.from('academies').update(data).eq('id',academy.id);
+  academy = {...academy,...data};
+  alert('저장 완료!');
+  render();
+}
+
+function downloadExcel(){
+  const data=students.map(s=>({이름:s.name,연락처:s.phone,과목:s.course,레벨:s.level,수강료:s.fee,납부:s.paid?'완료':'미납',수업요일:(s.days||[]).join(','),수업시간:s.time}));
+  const ws=XLSX.utils.json_to_sheet(data);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'원생');
+  XLSX.writeFile(wb,'원생목록.xlsx');
+}
+
+render();
+</script>
+</body>
+</html>
