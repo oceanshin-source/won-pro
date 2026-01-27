@@ -10,6 +10,8 @@
   <style>
     *{font-family:-apple-system,'Malgun Gothic',sans-serif;box-sizing:border-box}
     .sidebar-item.active{background:rgba(99,102,241,.15);color:#4f46e5;border-right:3px solid #4f46e5}
+    [contenteditable]:focus{outline:2px solid #6366f1;outline-offset:2px}
+    @media print{body *{visibility:hidden}.print-area,.print-area *{visibility:visible}.print-area{position:absolute;left:0;top:0;width:100%}}
   </style>
 </head>
 <body class="bg-gray-100">
@@ -26,6 +28,7 @@ let students = [];
 let notices = [];
 let consults = [];
 let todos = [];
+let homework = [];
 let attendance = {};
 let tab = 'dashboard';
 let modal = '';
@@ -34,12 +37,10 @@ let selectedStudents = {};
 let attTab = 'today';
 let viewStudentId = null;
 let loading = false;
+let docStudentId = '';
+let currentDoc = null;
 
-// 원생 등록 폼 상태 (render해도 유지)
-let formData = {
-  name: '', phone: '', pPhone: '', course: '', level: '', fee: 200000, paid: false,
-  schedule: {} // {월: '15:00', 수: '17:00', 금: '15:00'}
-};
+let formData = {name:'',phone:'',pPhone:'',course:'',level:'',fee:200000,paid:false,schedule:{},memo:''};
 
 const dayList = ['일','월','화','수','목','금','토'];
 const today = dayList[new Date().getDay()];
@@ -47,6 +48,18 @@ const yesterday = dayList[(new Date().getDay()+6)%7];
 const tomorrow = dayList[(new Date().getDay()+1)%7];
 const todayStr = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
 const todayISO = new Date().toISOString().split('T')[0];
+
+const docs = [
+  {id:1,cat:'증명서',name:'재원증명서',icon:'📜'},{id:2,cat:'증명서',name:'수료증',icon:'🎓'},{id:3,cat:'증명서',name:'출석확인서',icon:'✅'},
+  {id:4,cat:'증명서',name:'성적증명서',icon:'📊'},{id:5,cat:'증명서',name:'레벨확인서',icon:'📈'},
+  {id:6,cat:'안내문',name:'수강료안내',icon:'💰'},{id:7,cat:'안내문',name:'휴원안내',icon:'🏖️'},{id:8,cat:'안내문',name:'수업변경',icon:'📅'},
+  {id:9,cat:'안내문',name:'특강안내',icon:'⭐'},{id:10,cat:'안내문',name:'학원소개',icon:'🏫'},
+  {id:11,cat:'계약서',name:'수강계약서',icon:'📝'},{id:12,cat:'계약서',name:'환불동의서',icon:'💸'},{id:13,cat:'계약서',name:'개인정보동의서',icon:'🔒'},
+  {id:14,cat:'계약서',name:'초상권동의서',icon:'📷'},{id:15,cat:'계약서',name:'학원규칙동의서',icon:'📋'},
+  {id:16,cat:'영수증',name:'수강료영수증',icon:'🧾'},{id:17,cat:'영수증',name:'교재비영수증',icon:'📚'},{id:18,cat:'영수증',name:'환불영수증',icon:'💳'},
+  {id:19,cat:'학습관리',name:'학습플랜',icon:'🎯'},{id:20,cat:'학습관리',name:'상담일지',icon:'📞'},{id:21,cat:'학습관리',name:'레벨테스트',icon:'✏️'},
+  {id:22,cat:'학습관리',name:'성적표',icon:'📋'},{id:23,cat:'학습관리',name:'출결표',icon:'📆'}
+];
 
 function fmt(n){return n>=10000?(n/10000).toFixed(0)+'만':n.toLocaleString();}
 function getStudentsByDay(day){
@@ -59,7 +72,7 @@ function getStudentsByDay(day){
     return tA.localeCompare(tB);
   });
 }
-function getStudentTime(s, day){
+function getStudentTime(s,day){
   if(s.schedule && typeof s.schedule === 'object') return s.schedule[day] || '';
   return s.time || '';
 }
@@ -126,7 +139,7 @@ async function doRegister(){
   loading=true;render();
   const {data:academyData,error:err1} = await db.from('academies').insert({name,owner,phone,address}).select().single();
   if(err1){alert('학원 등록 실패: '+err1.message);loading=false;render();return;}
-  const {data:adminData,error:err2} = await db.from('admins').insert({academy_id:academyData.id,email,password:pw}).select().single();
+  const {error:err2} = await db.from('admins').insert({academy_id:academyData.id,email,password:pw});
   if(err2){alert('관리자 등록 실패: '+err2.message);loading=false;render();return;}
   alert('가입 완료! 로그인하세요.');
   loading=false;page='login';render();
@@ -138,7 +151,7 @@ async function doLogin(){
   if(!email||!pw){alert('이메일과 비밀번호를 입력하세요');return;}
   loading=true;render();
   const {data,error} = await db.from('admins').select('*,academies(*)').eq('email',email).eq('password',pw).single();
-  if(error||!data){alert('로그인 실패: 이메일 또는 비밀번호 확인');loading=false;render();return;}
+  if(error||!data){alert('로그인 실패');loading=false;render();return;}
   admin = data;
   academy = data.academies;
   await loadData();
@@ -152,13 +165,17 @@ async function loadData(){
   notices = n || [];
   const {data:t} = await db.from('todos').select('*').eq('academy_id',academy.id);
   todos = t || [];
+  const {data:c} = await db.from('consults').select('*').order('created_at',{ascending:false});
+  consults = (c || []).filter(x => students.some(st => st.id === x.student_id));
+  const {data:hw} = await db.from('homework').select('*').order('created_at',{ascending:false});
+  homework = (hw || []).filter(x => students.some(st => st.id === x.student_id));
   const {data:a} = await db.from('attendance').select('*').eq('date',todayISO);
   attendance = {};
   (a||[]).forEach(att=>{attendance[att.student_id]=att.status;});
 }
 
 function logout(){
-  admin=null;academy=null;students=[];notices=[];todos=[];attendance={};
+  admin=null;academy=null;students=[];notices=[];todos=[];consults=[];homework=[];attendance={};
   page='login';render();
 }
 
@@ -167,6 +184,7 @@ function renderMain(){
   const tomorrowS = getStudentsByDay(tomorrow);
   const unpaid = students.filter(s=>!s.paid);
   const revenue = students.filter(s=>s.paid).reduce((a,s)=>a+(s.fee||0),0);
+  const pendingConsults = consults.filter(c=>c.status==='대기');
 
   const menus = [
     {id:'dashboard',icon:'📊',label:'대시보드'},
@@ -174,40 +192,51 @@ function renderMain(){
     {id:'attendance',icon:'📅',label:'출결관리'},
     {id:'payments',icon:'💰',label:'수강료'},
     {id:'notices',icon:'📢',label:'공지사항'},
+    {id:'consult',icon:'💬',label:'상담',badge:pendingConsults.length},
+    {id:'homework',icon:'📝',label:'과제관리'},
+    {id:'documents',icon:'📄',label:'문서템플릿'},
     {id:'settings',icon:'⚙️',label:'설정'}
   ];
 
   let h = '<div class="flex min-h-screen">';
   
+  // 사이드바
   h += `<aside class="hidden lg:flex w-64 bg-white border-r flex-col fixed h-full">
     <div class="p-4 border-b"><div class="flex items-center gap-3"><span class="text-2xl">📚</span><div><div class="font-bold">${academy.name}</div><div class="text-xs text-gray-400">${academy.owner}</div></div></div></div>
-    <nav class="flex-1 py-2">`;
+    <nav class="flex-1 py-2 overflow-y-auto">`;
   menus.forEach(m=>{
     const cls = tab===m.id ? 'active bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50';
-    h += `<button onclick="tab='${m.id}';viewStudentId=null;render()" class="sidebar-item w-full px-4 py-3 flex items-center gap-3 text-left ${cls}">${m.icon} ${m.label}</button>`;
+    const badge = m.badge ? `<span class="ml-auto bg-red-500 text-white text-xs px-2 rounded-full">${m.badge}</span>` : '';
+    h += `<button onclick="tab='${m.id}';viewStudentId=null;render()" class="sidebar-item w-full px-4 py-3 flex items-center gap-3 text-left ${cls}">${m.icon} ${m.label}${badge}</button>`;
   });
   h += `</nav><div class="p-4 border-t"><button onclick="logout()" class="text-gray-500 text-sm">로그아웃</button></div></aside>`;
 
   h += '<main class="flex-1 lg:ml-64">';
   
+  // 헤더
   h += `<header class="bg-white border-b sticky top-0 z-10">
     <div class="px-4 h-14 flex items-center justify-between">
       <div class="flex items-center gap-2 lg:hidden"><span>📚</span><span class="font-bold">${academy.name}</span></div>
-      <div class="hidden lg:block font-bold">${menus.find(m=>m.id===tab)?.label||''}</div>
+      <div class="hidden lg:block font-bold">${viewStudentId ? '원생 상세' : menus.find(m=>m.id===tab)?.label||''}</div>
       <div class="flex gap-2">
         <button onclick="openAddStudent()" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg">+원생</button>
         <button onclick="logout()" class="lg:hidden text-gray-500 text-sm">로그아웃</button>
       </div>
     </div>
     <div class="lg:hidden flex border-t overflow-x-auto">`;
-  menus.forEach(m=>{
+  menus.slice(0,6).forEach(m=>{
     h += `<button onclick="tab='${m.id}';render()" class="px-4 py-2 text-sm whitespace-nowrap border-b-2 ${tab===m.id?'border-indigo-600 text-indigo-600':'border-transparent text-gray-500'}">${m.icon}</button>`;
   });
   h += '</div></header>';
 
   h += '<div class="p-4 lg:p-6">';
 
-  if(tab==='dashboard'){
+  // 원생 상세
+  if(viewStudentId){
+    h += renderStudentDetail();
+  }
+  // 대시보드
+  else if(tab==='dashboard'){
     h += `<div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-6 text-white mb-6">
       <p class="text-indigo-100">${todayStr} ${today}요일</p>
       <h2 class="text-2xl font-bold mt-1">안녕하세요, ${academy.owner} 원장님!</h2>
@@ -261,6 +290,7 @@ function renderMain(){
 
     // 사이드
     h += '<div class="space-y-4">';
+    // 할일
     h += `<div class="bg-white rounded-2xl border p-5">
       <div class="flex justify-between items-center mb-3"><h3 class="font-bold">📋 오늘 할 일</h3><button onclick="addTodo()" class="text-indigo-600 text-sm">+추가</button></div>
       <div class="space-y-2 text-sm">`;
@@ -274,6 +304,21 @@ function renderMain(){
     if(!todos.length) h += '<p class="text-gray-400 text-center py-2">할 일 없음</p>';
     h += '</div></div>';
 
+    // 상담대기
+    h += `<div class="bg-white rounded-2xl border p-5">
+      <div class="flex justify-between items-center mb-3"><h3 class="font-bold">💬 상담 대기</h3>${pendingConsults.length?`<span class="bg-red-500 text-white text-xs px-2 py-1 rounded-full">${pendingConsults.length}</span>`:''}</div>`;
+    if(pendingConsults.length){
+      pendingConsults.slice(0,2).forEach(c=>{
+        const stu = students.find(s=>s.id===c.student_id);
+        h += `<div class="p-3 bg-red-50 rounded-xl mb-2"><div class="font-medium text-sm">${stu?.name||''}</div><p class="text-xs text-gray-600 truncate">${c.message||''}</p></div>`;
+      });
+      h += `<button onclick="tab='consult';render()" class="w-full py-2 text-indigo-600 text-sm">답변하기 →</button>`;
+    } else {
+      h += '<p class="text-gray-400 text-center py-4 text-sm">대기중 상담 없음 ✨</p>';
+    }
+    h += '</div>';
+
+    // 미납
     h += `<div class="bg-white rounded-2xl border p-5">
       <div class="flex justify-between items-center mb-3"><h3 class="font-bold">💸 미납</h3><span class="text-red-600 font-medium">${fmt(unpaid.reduce((a,s)=>a+(s.fee||0),0))}</span></div>`;
     unpaid.slice(0,3).forEach(s=>{
@@ -283,12 +328,12 @@ function renderMain(){
     h += '</div></div></div>';
   }
 
+  // 원생관리
   else if(tab==='students'){
     h += `<div class="flex justify-between items-center mb-4">
       <input type="text" placeholder="검색..." class="px-4 py-2 border rounded-xl w-64">
       <button onclick="downloadExcel()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm">📥 엑셀</button>
     </div>`;
-    
     h += '<div class="bg-white rounded-2xl border overflow-hidden">';
     h += `<table class="w-full"><thead><tr class="bg-gray-50 border-b">
       <th class="text-left px-4 py-3 text-sm">원생</th>
@@ -298,7 +343,7 @@ function renderMain(){
     </tr></thead><tbody>`;
     students.forEach(s=>{
       const scheduleStr = s.schedule ? Object.entries(s.schedule).map(([d,t])=>`${d} ${t}`).join(', ') : (s.days||[]).join(' ')+' '+(s.time||'');
-      h += `<tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="openEditStudent('${s.id}')">
+      h += `<tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="viewStudentId='${s.id}';render()">
         <td class="px-4 py-3"><div class="flex items-center gap-3">
           <div class="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">${s.name?.[0]||'?'}</div>
           <div><div class="font-medium">${s.name}</div><div class="text-xs text-gray-500">${s.phone||''}</div></div>
@@ -312,6 +357,7 @@ function renderMain(){
     h += '</tbody></table></div>';
   }
 
+  // 출결관리
   else if(tab==='attendance'){
     const list = attTab==='yesterday'?getStudentsByDay(yesterday):attTab==='tomorrow'?getStudentsByDay(tomorrow):getStudentsByDay(today);
     const dayLabel = attTab==='yesterday'?yesterday:attTab==='tomorrow'?tomorrow:today;
@@ -358,6 +404,7 @@ function renderMain(){
     h += '</div>';
   }
 
+  // 수강료
   else if(tab==='payments'){
     const total = students.reduce((a,s)=>a+(s.fee||0),0);
     const paidAmt = students.filter(s=>s.paid).reduce((a,s)=>a+(s.fee||0),0);
@@ -388,6 +435,7 @@ function renderMain(){
     h += '</div>';
   }
 
+  // 공지사항
   else if(tab==='notices'){
     h += `<div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">📢 공지사항</h2><button onclick="addNotice()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm">+ 새 공지</button></div>`;
     notices.forEach(n=>{
@@ -400,6 +448,77 @@ function renderMain(){
     if(!notices.length) h += '<p class="text-gray-400 text-center py-8">공지사항 없음</p>';
   }
 
+  // 상담
+  else if(tab==='consult'){
+    h += '<h2 class="text-xl font-bold mb-4">💬 상담 관리</h2>';
+    if(consults.length){
+      consults.forEach(c=>{
+        const stu = students.find(s=>s.id===c.student_id);
+        h += `<div class="bg-white rounded-2xl border p-5 mb-3 ${c.status==='대기'?'border-l-4 border-l-red-500':''}">
+          <div class="flex justify-between mb-2"><span class="font-medium">${stu?.name||'알수없음'}</span><span class="text-xs px-2 py-1 rounded-full ${c.status==='대기'?'bg-red-100 text-red-600':'bg-emerald-100 text-emerald-600'}">${c.status}</span></div>
+          <div class="p-3 bg-gray-50 rounded-xl mb-3">${c.message||''}</div>
+          ${c.reply?`<div class="p-3 bg-indigo-50 rounded-xl"><span class="text-xs text-indigo-600">답변</span><p class="mt-1">${c.reply}</p></div>`:`<textarea id="reply${c.id}" class="w-full p-3 border rounded-xl mb-2" placeholder="답변 입력"></textarea><button onclick="sendReply('${c.id}')" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm">답변</button>`}
+        </div>`;
+      });
+    } else {
+      h += '<p class="text-gray-400 text-center py-8">상담 내역 없음</p>';
+    }
+  }
+
+  // 과제관리
+  else if(tab==='homework'){
+    h += '<h2 class="text-xl font-bold mb-4">📝 과제 관리</h2>';
+    h += '<div class="grid md:grid-cols-2 gap-4">';
+    students.forEach(s=>{
+      const sHw = homework.filter(hw=>hw.student_id===s.id);
+      h += `<div class="bg-white rounded-2xl border p-5">
+        <div class="flex justify-between items-center mb-3">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">${s.name?.[0]||'?'}</div>
+            <div><div class="font-medium">${s.name}</div><div class="text-xs text-gray-500">${s.course||''}</div></div>
+          </div>
+          <button onclick="addHomework('${s.id}')" class="text-indigo-600 text-sm">+과제</button>
+        </div>`;
+      if(sHw.length){
+        sHw.forEach(hw=>{
+          h += `<div class="p-2 bg-gray-50 rounded-lg text-sm flex items-center gap-2 mb-1">
+            <input type="checkbox" ${hw.done?'checked':''} onchange="toggleHomework('${hw.id}')" class="w-4 h-4">
+            <span class="${hw.done?'line-through text-gray-400':''}">${hw.title}</span>
+            <button onclick="deleteHomework('${hw.id}')" class="ml-auto text-gray-400 hover:text-red-500">✕</button>
+          </div>`;
+        });
+      } else {
+        h += '<p class="text-gray-400 text-sm text-center py-2">과제 없음</p>';
+      }
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+
+  // 문서템플릿
+  else if(tab==='documents'){
+    const cats = [...new Set(docs.map(d=>d.cat))];
+    h += `<div class="bg-gradient-to-r from-violet-500 to-purple-600 rounded-2xl p-6 text-white mb-6">
+      <h3 class="text-xl font-bold">📄 문서 템플릿 (23종)</h3>
+      <p class="text-violet-100">원생 정보 자동 입력 + 직접 편집 가능</p>
+    </div>`;
+    h += '<div class="bg-white rounded-2xl border p-5">';
+    h += `<div class="mb-4"><label class="text-sm font-medium">원생 선택</label>
+      <select id="docStudent" onchange="docStudentId=this.value" class="ml-2 px-3 py-2 border rounded-xl">
+        <option value="">선택안함</option>`;
+    students.forEach(s=>{h+=`<option value="${s.id}">${s.name}</option>`;});
+    h += '</select></div>';
+    cats.forEach(cat=>{
+      h += `<div class="mb-4"><h4 class="text-sm font-bold text-gray-500 mb-2">${cat}</h4><div class="grid grid-cols-3 sm:grid-cols-5 gap-2">`;
+      docs.filter(d=>d.cat===cat).forEach(d=>{
+        h += `<button onclick="openDoc(${d.id})" class="p-3 bg-gray-50 rounded-xl hover:bg-indigo-50 text-center"><span class="text-2xl">${d.icon}</span><div class="text-xs mt-1">${d.name}</div></button>`;
+      });
+      h += '</div></div>';
+    });
+    h += '</div>';
+  }
+
+  // 설정
   else if(tab==='settings'){
     h += `<div class="bg-white rounded-2xl border p-6 mb-4">
       <h2 class="font-bold mb-4">🏫 학원 정보</h2>
@@ -415,12 +534,49 @@ function renderMain(){
 
   h += '</div></main></div>';
 
+  // 모달
   if(modal==='addStudent') h += renderStudentModal();
   if(modal==='sms') h += renderSmsModal();
+  if(modal==='docPreview' && currentDoc) h += renderDocModal();
 
   return h;
 }
 
+// 원생 상세
+function renderStudentDetail(){
+  const s = students.find(x=>x.id===viewStudentId);
+  if(!s) return '<p>원생 정보 없음</p>';
+  const scheduleStr = s.schedule ? Object.entries(s.schedule).map(([d,t])=>`${d} ${t}`).join(', ') : (s.days||[]).join(' ')+' '+(s.time||'');
+  
+  let h = '<div class="max-w-2xl">';
+  h += `<button onclick="viewStudentId=null;render()" class="mb-4 text-indigo-600">← 목록으로</button>`;
+  
+  h += `<div class="bg-white rounded-2xl border p-6 mb-4">
+    <div class="flex items-center gap-4 mb-4">
+      <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl font-bold">${s.name?.[0]||'?'}</div>
+      <div><h2 class="text-xl font-bold">${s.name}</h2><p class="text-gray-500">${s.course||''} · ${s.level||''}</p></div>
+      <button onclick="openEditStudent('${s.id}')" class="ml-auto px-4 py-2 border rounded-xl text-sm">수정</button>
+    </div>
+    <div class="grid grid-cols-2 gap-4 text-sm">
+      <div><span class="text-gray-500">연락처</span><div class="font-medium">${s.phone||'-'}</div></div>
+      <div><span class="text-gray-500">학부모</span><div class="font-medium">${s.parent_phone||'-'}</div></div>
+      <div><span class="text-gray-500">수업일정</span><div class="font-medium">${scheduleStr||'-'}</div></div>
+      <div><span class="text-gray-500">수강료</span><div class="font-medium ${s.paid?'':'text-red-600'}">${fmt(s.fee||0)} (${s.paid?'완료':'미납'})</div></div>
+    </div>
+  </div>`;
+
+  // 메모
+  h += `<div class="bg-white rounded-2xl border p-6 mb-4">
+    <h3 class="font-bold mb-3">📝 메모</h3>
+    <textarea id="studentMemo" class="w-full p-3 border rounded-xl" rows="3" placeholder="메모 입력...">${s.memo||''}</textarea>
+    <button onclick="saveMemo('${s.id}')" class="mt-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm">저장</button>
+  </div>`;
+
+  h += '</div>';
+  return h;
+}
+
+// 원생 모달
 function renderStudentModal(){
   const s = editingId ? students.find(x=>x.id===editingId) : null;
   
@@ -435,24 +591,18 @@ function renderStudentModal(){
           <input type="text" id="sCourse" value="${formData.course}" oninput="formData.course=this.value" class="px-4 py-2 border rounded-xl" placeholder="과목">
           <input type="text" id="sLevel" value="${formData.level}" oninput="formData.level=this.value" class="px-4 py-2 border rounded-xl" placeholder="레벨">
         </div>
-        
         <div class="bg-indigo-50 rounded-xl p-3">
           <div class="text-sm font-medium mb-2">수업 일정 (요일별 시간)</div>
           <div class="space-y-2">`;
-  
   ['월','화','수','목','금','토','일'].forEach(d=>{
     const hasDay = formData.schedule[d] !== undefined;
     const time = formData.schedule[d] || '16:00';
     h += `<div class="flex items-center gap-2">
       <button type="button" onclick="toggleDaySchedule('${d}')" class="w-10 h-10 rounded-lg text-sm font-bold ${hasDay?'bg-indigo-600 text-white':'bg-white border'}">${d}</button>
-      ${hasDay ? `<input type="time" value="${time}" onchange="formData.schedule['${d}']=this.value" class="flex-1 px-3 py-2 border rounded-lg">
-      <span class="text-xs text-gray-500">${d}요일</span>` : '<span class="text-gray-400 text-sm">수업 없음</span>'}
+      ${hasDay ? `<input type="time" value="${time}" onchange="formData.schedule['${d}']=this.value" class="flex-1 px-3 py-2 border rounded-lg"><span class="text-xs text-gray-500">${d}요일</span>` : '<span class="text-gray-400 text-sm">수업 없음</span>'}
     </div>`;
   });
-  
-  h += `</div>
-        </div>
-        
+  h += `</div></div>
         <input type="number" id="sFee" value="${formData.fee}" oninput="formData.fee=parseInt(this.value)||0" class="w-full px-4 py-2 border rounded-xl" placeholder="수강료">
         <label class="flex items-center gap-2"><input type="checkbox" id="sPaid" ${formData.paid?'checked':''} onchange="formData.paid=this.checked" class="w-5 h-5">납부완료</label>
         <div class="flex gap-2">
@@ -466,6 +616,7 @@ function renderStudentModal(){
   return h;
 }
 
+// SMS 모달
 function renderSmsModal(){
   const selIds = Object.keys(selectedStudents).filter(k=>selectedStudents[k]);
   const selStudents = selIds.map(id=>students.find(s=>s.id===id)).filter(Boolean);
@@ -485,9 +636,46 @@ function renderSmsModal(){
   </div>`;
 }
 
+// 문서 모달
+function renderDocModal(){
+  const d = currentDoc;
+  const s = docStudentId ? students.find(x=>x.id===docStudentId) : null;
+  const content = getDocContent(d, s);
+  
+  return `<div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onclick="if(event.target===this){modal='';currentDoc=null;render();}">
+    <div class="bg-white rounded-2xl w-full max-w-3xl max-h-[95vh] overflow-hidden flex flex-col">
+      <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+        <span class="font-bold">${d.icon} ${d.name}</span>
+        <div class="flex gap-2">
+          <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm">🖨️ 인쇄</button>
+          <button onclick="modal='';currentDoc=null;render()" class="px-4 py-2 bg-gray-200 rounded-xl">✕</button>
+        </div>
+      </div>
+      <div class="p-2 bg-amber-50 text-amber-800 text-sm text-center">💡 문서를 클릭하여 직접 편집할 수 있습니다</div>
+      <div class="flex-1 overflow-y-auto bg-gray-300 p-6 print-area">
+        <div id="docContent" contenteditable="true" class="bg-white shadow-xl mx-auto cursor-text" style="width:210mm;min-height:297mm;padding:20mm;">${content}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function getDocContent(doc, stu){
+  const s = stu || {name:'___________',course:'___________',level:'___',phone:'_______________',fee:0};
+  const a = academy;
+  const header = `<div style="border-bottom:2px solid #333;padding-bottom:15px;margin-bottom:30px;text-align:center;"><div style="font-size:16pt;font-weight:bold;">${a.name}</div><div style="font-size:9pt;color:#666;">${a.address||''} | Tel: ${a.phone||''}</div></div>`;
+  const footer = `<div style="margin-top:80px;text-align:center;"><p>${todayStr}</p><p style="font-size:14pt;font-weight:bold;margin-top:30px;">${a.name}</p><p>원장 ${a.owner} (인)</p></div>`;
+  
+  if(doc.name==='재원증명서') return header+`<h1 style="text-align:center;font-size:24pt;letter-spacing:10px;margin:50px 0;">재 원 증 명 서</h1><table style="width:100%;border-collapse:collapse;margin:30px 0;"><tr><td style="border:1px solid #333;padding:12px;width:25%;background:#f5f5f5;font-weight:bold;">성 명</td><td style="border:1px solid #333;padding:12px;">${s.name}</td></tr><tr><td style="border:1px solid #333;padding:12px;background:#f5f5f5;font-weight:bold;">수강과목</td><td style="border:1px solid #333;padding:12px;">${s.course||''}</td></tr><tr><td style="border:1px solid #333;padding:12px;background:#f5f5f5;font-weight:bold;">레 벨</td><td style="border:1px solid #333;padding:12px;">${s.level||''}</td></tr></table><div style="text-align:center;margin:60px 0;font-size:14pt;">위 학생은 본 학원에 재원 중임을 증명합니다.</div>`+footer;
+  
+  if(doc.name==='수강료영수증') return header+`<h1 style="text-align:center;font-size:24pt;letter-spacing:10px;margin:50px 0;">영 수 증</h1><div style="text-align:center;margin:40px 0;padding:30px;border:3px solid #333;"><p>금 액</p><p style="font-size:28pt;font-weight:bold;color:#c00;">${(s.fee||0).toLocaleString()}원</p></div><table style="width:100%;border-collapse:collapse;"><tr><td style="border:1px solid #333;padding:12px;width:25%;background:#f5f5f5;">내 용</td><td style="border:1px solid #333;padding:12px;">${s.course||''} 수강료</td></tr><tr><td style="border:1px solid #333;padding:12px;background:#f5f5f5;">원 생</td><td style="border:1px solid #333;padding:12px;">${s.name}</td></tr></table><p style="text-align:center;margin:50px 0;">위 금액을 정히 영수함.</p>`+footer;
+  
+  return header+`<h1 style="text-align:center;font-size:22pt;margin:50px 0;">${doc.name}</h1><p style="text-align:center;color:#666;margin:30px 0;">내용을 입력하세요.</p>`+footer;
+}
+
+// 함수들
 function openAddStudent(){
   editingId = null;
-  formData = {name:'',phone:'',pPhone:'',course:'',level:'',fee:200000,paid:false,schedule:{}};
+  formData = {name:'',phone:'',pPhone:'',course:'',level:'',fee:200000,paid:false,schedule:{},memo:''};
   modal = 'addStudent';
   render();
 }
@@ -504,9 +692,9 @@ function openEditStudent(id){
     level: s.level || '',
     fee: s.fee || 200000,
     paid: s.paid || false,
-    schedule: s.schedule || {}
+    schedule: s.schedule || {},
+    memo: s.memo || ''
   };
-  // 기존 days/time 형식이면 변환
   if(!s.schedule && s.days && s.days.length){
     formData.schedule = {};
     s.days.forEach(d => { formData.schedule[d] = s.time || '16:00'; });
@@ -532,7 +720,6 @@ function toggleDaySchedule(d){
 
 async function saveStudent(){
   if(!formData.name){alert('이름을 입력하세요');return;}
-  
   const data = {
     academy_id: academy.id,
     name: formData.name,
@@ -544,17 +731,15 @@ async function saveStudent(){
     paid: formData.paid,
     schedule: formData.schedule,
     days: Object.keys(formData.schedule),
-    time: Object.values(formData.schedule)[0] || ''
+    time: Object.values(formData.schedule)[0] || '',
+    memo: formData.memo
   };
-  
   loading=true;render();
-  
   if(editingId){
     await db.from('students').update(data).eq('id',editingId);
   } else {
     await db.from('students').insert(data);
   }
-  
   await loadData();
   modal='';editingId=null;
   loading=false;render();
@@ -565,8 +750,16 @@ async function deleteStudent(id){
   loading=true;render();
   await db.from('students').delete().eq('id',id);
   await loadData();
-  modal='';editingId=null;
+  modal='';editingId=null;viewStudentId=null;
   loading=false;render();
+}
+
+async function saveMemo(id){
+  const memo = document.getElementById('studentMemo').value;
+  await db.from('students').update({memo}).eq('id',id);
+  const s = students.find(x=>x.id===id);
+  if(s) s.memo = memo;
+  alert('저장 완료!');
 }
 
 async function toggleAtt(id){
@@ -627,6 +820,43 @@ async function deleteNotice(id){
     await loadData();
     render();
   }
+}
+
+async function sendReply(id){
+  const el=document.getElementById('reply'+id);
+  if(!el||!el.value)return;
+  await db.from('consults').update({reply:el.value,status:'완료'}).eq('id',id);
+  await loadData();
+  render();
+}
+
+async function addHomework(studentId){
+  const title=prompt('과제:');
+  if(!title)return;
+  await db.from('homework').insert({student_id:studentId,title});
+  await loadData();
+  render();
+}
+
+async function toggleHomework(id){
+  const hw=homework.find(x=>x.id===id);
+  if(hw){
+    await db.from('homework').update({done:!hw.done}).eq('id',id);
+    await loadData();
+    render();
+  }
+}
+
+async function deleteHomework(id){
+  await db.from('homework').delete().eq('id',id);
+  await loadData();
+  render();
+}
+
+function openDoc(id){
+  currentDoc = docs.find(d=>d.id===id);
+  modal = 'docPreview';
+  render();
 }
 
 function openSmsModal(){
