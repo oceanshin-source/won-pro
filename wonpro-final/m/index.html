@@ -59,6 +59,12 @@ async function init() {
     return;
   }
   
+  // 성인회원 접속 허용 체크
+  if (data.allow_member === false) {
+    document.getElementById('app').innerHTML = '<div class="min-h-screen flex items-center justify-center text-gray-500"><div class="text-center"><div class="text-4xl mb-4">🚫</div><p>현재 회원 접속이 제한되어 있습니다.</p><p class="text-sm mt-2">학원에 문의해주세요.</p></div></div>';
+    return;
+  }
+  
   academy = data;
   render();
 }
@@ -82,6 +88,14 @@ async function login() {
   
   if (error || !data) {
     alert('등록된 정보를 찾을 수 없습니다');
+    loading = false;
+    render();
+    return;
+  }
+  
+  // 개별 차단 체크
+  if (data.blocked) {
+    alert('접속이 제한되었습니다. 학원에 문의해주세요.');
     loading = false;
     render();
     return;
