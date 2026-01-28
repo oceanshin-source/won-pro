@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>원생관리 Pro - 관리자</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{font-family:-apple-system,'Malgun Gothic',sans-serif;box-sizing:border-box}
+    .sidebar-item.active{background:rgba(99,102,241,.15);color:#4f46e5;border-left:3px solid #4f46e5}
+  </style>
+</head>
+<body class="bg-gray-100">
+<div id="app"></div>
+<script>
+const SUPABASE_URL = 'https://sniabexwdgeepakkxxek.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuaWFiZXh3ZGdlZXBha2t4eGVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MDMxNzIsImV4cCI6MjA4NTA3OTE3Mn0.RsDQDyawjFk5voFLVouXDlTIXvhPrsziCD37ne-1jMU';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// 어드민 비밀번호 (실제론 환경변수나 DB로)
+const ADMIN_PW = 'bada2026!';
+
+let page = 'login';
+let tab = 'dashboard';
+let academies = [];
+let ads = [];
+let loading = false;
+
+// 카테고리 목록
+const allCategories = [
+  '영어', '중국어', '일본어', '기타외국어',
+  '피아노', '바이올린/첼로', '기타/우쿨렐레', '드럼/타악기', '보컬/성악', '작곡/미디',
+  '미술(회화)', '만화/웹툰', '공예/도예', '서예/캘리',
+  '태권도', '합기도/유도/검도', '수영', '발레/무용', '체조/줄넘기', '축구/농구', '헬스/PT', '필라테스/요가', '골프', '클라이밍',
+  '국어/논술', '수학', '영어(입시)', '과학', '사회/역사', '종합입시', '보습/공부방',
+  '코딩', '컴퓨터활용', '자격증',
+  '요리/베이킹', '바둑/체스', '독서/토론', '기타'
+];
+
+async function init() {
+  render();
+}
+
+function login() {
+  const pw = document.getElementById('adminPw').value;
+  if (pw === ADMIN_PW) {
+    page = 'main';
+    loadData();
+  } else {
+    alert('비밀번호가 틀렸습니다');
+  }
+}
+
+async function loadData() {
+  loading = true;
+  render();
+  
+  const { data: a } = await db.from('academies').select('*').order('created_at', { ascending: false });
+  academies = a || [];
+  
+  const { data: ad } = await db.from('ads').select('*').order('category');
+  ads = ad || [];
+  
+  loading = false;
+  render();
+}
+
+function render() {
+  const app = document.getElementById('app');
+  if (page === 'login') {
+    app.innerHTML = renderLogin();
+  } else {
+    app.innerHTML = renderMain();
+  }
+}
+
+function renderLogin() {
+  return `
+    <div class="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4">
+      <div class="w-full max-w-sm">
+        <div class="text-center mb-8">
+          <div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-4 text-4xl">🔐</div>
+          <h1 class="text-2xl font-bold text-white">관리자 페이지</h1>
+          <p class="text-slate-400 mt-1">원생관리 Pro</p>
+        </div>
+        <div class="bg-white rounded-2xl p-6 shadow-xl">
+          <input type="password" id="adminPw" placeholder="관리자 비밀번호" 
+            class="w-full px-4 py-3 border rounded-xl mb-4"
+            onkeypress="if(event.key==='Enter')login()">
+          <button onclick="login()" class="w-full py-3 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700">
+            로그인
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMain() {
+  const menus = [
+    { id: 'dashboard', icon: '📊', label: '대시보드' },
+    { id: 'academies', icon: '🏢', label: '학원 관리' },
+    { id: 'ads', icon: '🎯', label: '광고 관리' },
+    { id: 'subscriptions', icon: '💰', label: '구독 현황' },
+    { id: 'settings', icon: '⚙️', label: '설정' }
+  ];
+  
+  // 통계
+  const totalAcademies = academies.length;
+  const thisMonth = academies.filter(a => {
+    const created = new Date(a.created_at);
+    const now = new Date();
+    return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+  }).length;
+  
+  // 카테고리별 통계
+  const catStats = {};
+  academies.forEach(a => {
+    (a.categories || []).forEach(c => {
+      catStats[c] = (catStats[c] || 0) + 1;
+    });
+  });
+  
+  let h = `
+    <div class="flex min-h-screen">
+      <!-- 사이드바 -->
+      <aside class="w-64 bg-slate-900 text-white flex flex-col fixed h-full">
+        <div class="p-4 border-b border-slate-700">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🔐</span>
+            <div>
+              <div class="font-bold">원생관리 Pro</div>
+              <div class="text-xs text-slate-400">관리자</div>
+            </div>
+          </div>
+        </div>
+        <nav class="flex-1 py-4">
+          ${menus.map(m => `
+            <button onclick="tab='${m.id}';render()" 
+              class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-800 sidebar-item ${tab === m.id ? 'active' : ''}">
+              <span class="text-xl">${m.icon}</span>
+              <span>${m.label}</span>
+            </button>
+          `).join('')}
+        </nav>
+        <div class="p-4 border-t border-slate-700">
+          <button onclick="page='login';render()" class="w-full py-2 bg-slate-700 rounded-lg text-sm">로그아웃</button>
+        </div>
+      </aside>
+      
+      <!-- 메인 -->
+      <main class="flex-1 ml-64 p-6">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold">${menus.find(m => m.id === tab)?.label || ''}</h1>
+        </div>
+  `;
+  
+  // 대시보드
+  if (tab === 'dashboard') {
+    h += `
+      <div class="grid grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-2xl p-5 shadow-sm">
+          <div class="text-gray-500 text-sm">전체 학원</div>
+          <div class="text-3xl font-bold text-indigo-600 mt-1">${totalAcademies}</div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm">
+          <div class="text-gray-500 text-sm">이번달 신규</div>
+          <div class="text-3xl font-bold text-emerald-600 mt-1">${thisMonth}</div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm">
+          <div class="text-gray-500 text-sm">등록된 광고</div>
+          <div class="text-3xl font-bold text-amber-600 mt-1">${ads.length}</div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm">
+          <div class="text-gray-500 text-sm">오늘 쿠팡 확률</div>
+          <div class="text-3xl font-bold text-rose-600 mt-1">${getTodayRate().toFixed(2)}%</div>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl p-5 shadow-sm">
+          <h3 class="font-bold mb-4">📊 카테고리별 학원 수</h3>
+          <div class="space-y-2 max-h-80 overflow-y-auto">
+            ${Object.entries(catStats).sort((a,b) => b[1] - a[1]).map(([cat, count]) => `
+              <div class="flex items-center gap-3">
+                <div class="flex-1 text-sm">${cat}</div>
+                <div class="w-32 bg-gray-200 rounded-full h-2">
+                  <div class="bg-indigo-500 h-2 rounded-full" style="width: ${count/totalAcademies*100}%"></div>
+                </div>
+                <div class="w-8 text-right text-sm font-medium">${count}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        
+        <div class="bg-white rounded-2xl p-5 shadow-sm">
+          <h3 class="font-bold mb-4">🆕 최근 가입 학원</h3>
+          <div class="space-y-3">
+            ${academies.slice(0, 5).map(a => `
+              <div class="flex items-center justify-between py-2 border-b">
+                <div>
+                  <div class="font-medium">${a.name}</div>
+                  <div class="text-xs text-gray-400">${(a.categories || []).join(', ') || '미설정'}</div>
+                </div>
+                <div class="text-xs text-gray-500">${new Date(a.created_at).toLocaleDateString('ko-KR')}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  // 학원 관리
+  else if (tab === 'academies') {
+    h += `
+      <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div class="p-4 border-b flex justify-between items-center">
+          <div class="text-sm text-gray-500">총 ${academies.length}개 학원</div>
+          <input type="text" id="searchAcademy" placeholder="학원명 검색..." 
+            class="px-4 py-2 border rounded-xl text-sm" onkeyup="filterAcademies()">
+        </div>
+        <table class="w-full">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">학원명</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">원장</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">카테고리</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">가입일</th>
+              <th class="px-4 py-3 text-left text-sm font-medium text-gray-600">요금제</th>
+              <th class="px-4 py-3 text-center text-sm font-medium text-gray-600">관리</th>
+            </tr>
+          </thead>
+          <tbody id="academyList">
+            ${academies.map(a => `
+              <tr class="border-b hover:bg-gray-50 academy-row" data-name="${a.name}">
+                <td class="px-4 py-3">
+                  <div class="font-medium">${a.name}</div>
+                  <div class="text-xs text-gray-400">${a.id.slice(0,8)}...</div>
+                </td>
+                <td class="px-4 py-3 text-sm">${a.owner || '-'}</td>
+                <td class="px-4 py-3">
+                  <div class="flex flex-wrap gap-1">
+                    ${(a.categories || []).slice(0,3).map(c => `<span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs">${c}</span>`).join('')}
+                    ${(a.categories || []).length > 3 ? `<span class="text-xs text-gray-400">+${a.categories.length - 3}</span>` : ''}
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-500">${new Date(a.created_at).toLocaleDateString('ko-KR')}</td>
+                <td class="px-4 py-3">
+                  <span class="px-2 py-1 rounded text-xs ${a.plan === 'business' ? 'bg-purple-100 text-purple-700' : a.plan === 'pro' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700'}">
+                    ${a.plan || 'basic'}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <button onclick="viewAcademy('${a.id}')" class="px-2 py-1 text-sm text-indigo-600 hover:bg-indigo-50 rounded">상세</button>
+                  <button onclick="deleteAcademy('${a.id}')" class="px-2 py-1 text-sm text-red-600 hover:bg-red-50 rounded">삭제</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+  
+  // 광고 관리
+  else if (tab === 'ads') {
+    h += `
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+        <h4 class="font-bold text-amber-800 mb-2">🎯 쿠팡 파트너스 광고 설정</h4>
+        <p class="text-sm text-amber-700">카테고리별로 쿠팡 링크를 설정하면, 해당 카테고리 학원의 학부모/학생 페이지에 노출됩니다.</p>
+        <p class="text-sm text-amber-700 mt-1">오늘의 쿠키 심기 확률: <strong>${getTodayRate().toFixed(2)}%</strong> (매일 3~10% 랜덤)</p>
+      </div>
+      
+      <div class="flex justify-end mb-4">
+        <button onclick="openAdModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl">+ 광고 추가</button>
+      </div>
+      
+      <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        ${ads.map(ad => `
+          <div class="bg-white rounded-2xl p-5 shadow-sm border ${ad.active ? 'border-green-200' : 'border-gray-200'}">
+            <div class="flex justify-between items-start mb-3">
+              <span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-sm">${ad.category}</span>
+              <span class="px-2 py-1 rounded text-xs ${ad.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">${ad.active ? '활성' : '비활성'}</span>
+            </div>
+            <div class="font-medium mb-2">${ad.name || '광고'}</div>
+            <div class="text-xs text-gray-400 truncate mb-3">${ad.coupang_url || '-'}</div>
+            <div class="flex gap-2">
+              <button onclick="editAd('${ad.id}')" class="flex-1 py-2 border rounded-lg text-sm">수정</button>
+              <button onclick="toggleAd('${ad.id}', ${!ad.active})" class="flex-1 py-2 ${ad.active ? 'bg-gray-100' : 'bg-green-100'} rounded-lg text-sm">
+                ${ad.active ? '비활성화' : '활성화'}
+              </button>
+              <button onclick="deleteAd('${ad.id}')" class="px-3 py-2 bg-red-100 text-red-600 rounded-lg text-sm">삭제</button>
+            </div>
+          </div>
+        `).join('')}
+        
+        ${ads.length === 0 ? `
+          <div class="col-span-full text-center py-12 text-gray-400">
+            <div class="text-4xl mb-3">🎯</div>
+            <p>등록된 광고가 없습니다</p>
+          </div>
+        ` : ''}
+      </div>
+      
+      <div class="mt-8 bg-white rounded-2xl p-5 shadow-sm">
+        <h3 class="font-bold mb-4">📋 카테고리별 광고 현황</h3>
+        <div class="grid grid-cols-4 gap-2 text-sm">
+          ${allCategories.map(cat => {
+            const hasAd = ads.some(a => a.category === cat && a.active);
+            return `<div class="px-3 py-2 rounded ${hasAd ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">${cat}</div>`;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+  
+  // 구독 현황
+  else if (tab === 'subscriptions') {
+    const plans = { basic: 0, pro: 0, business: 0 };
+    academies.forEach(a => {
+      const plan = a.plan || 'basic';
+      plans[plan]++;
+    });
+    const monthlyRevenue = plans.basic * 8900 + plans.pro * 14900 + plans.business * 38900;
+    
+    h += `
+      <div class="grid grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-2xl p-5 shadow-sm">
+          <div class="text-gray-500 text-sm">Basic</div>
+          <div class="text-3xl font-bold mt-1">${plans.basic}</div>
+          <div class="text-sm text-gray-400">× 8,900원</div>
+        </div>
+        <div class="bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-2xl p-5 shadow-sm">
+          <div class="text-indigo-100 text-sm">Pro</div>
+          <div class="text-3xl font-bold mt-1">${plans.pro}</div>
+          <div class="text-sm text-indigo-200">× 14,900원</div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm">
+          <div class="text-gray-500 text-sm">Business</div>
+          <div class="text-3xl font-bold mt-1">${plans.business}</div>
+          <div class="text-sm text-gray-400">× 38,900원</div>
+        </div>
+        <div class="bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-2xl p-5 shadow-sm">
+          <div class="text-emerald-100 text-sm">예상 월 매출</div>
+          <div class="text-3xl font-bold mt-1">${(monthlyRevenue / 10000).toFixed(1)}만</div>
+          <div class="text-sm text-emerald-200">원</div>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-2xl p-5 shadow-sm">
+        <h3 class="font-bold mb-4">요금제별 학원 목록</h3>
+        <div class="space-y-4">
+          ${['business', 'pro', 'basic'].map(plan => {
+            const list = academies.filter(a => (a.plan || 'basic') === plan);
+            if (list.length === 0) return '';
+            return `
+              <div>
+                <div class="font-medium mb-2 ${plan === 'business' ? 'text-purple-600' : plan === 'pro' ? 'text-indigo-600' : 'text-gray-600'}">
+                  ${plan.toUpperCase()} (${list.length}개)
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  ${list.map(a => `<span class="px-3 py-1 bg-gray-100 rounded-full text-sm">${a.name}</span>`).join('')}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+  
+  // 설정
+  else if (tab === 'settings') {
+    h += `
+      <div class="max-w-2xl space-y-6">
+        <div class="bg-white rounded-2xl p-5 shadow-sm">
+          <h3 class="font-bold mb-4">🔐 관리자 비밀번호</h3>
+          <input type="password" id="newPw" placeholder="새 비밀번호" class="w-full px-4 py-2 border rounded-xl mb-3">
+          <button onclick="alert('실제 구현 시 환경변수나 DB로 관리')" class="px-4 py-2 bg-indigo-600 text-white rounded-xl">변경</button>
+        </div>
+        
+        <div class="bg-white rounded-2xl p-5 shadow-sm">
+          <h3 class="font-bold mb-4">📊 쿠팡 확률 확인</h3>
+          <p class="text-sm text-gray-600 mb-3">날짜 기반 시드로 매일 자동 결정됩니다.</p>
+          <div class="grid grid-cols-7 gap-2 text-center text-sm">
+            ${Array.from({length: 7}, (_, i) => {
+              const d = new Date();
+              d.setDate(d.getDate() + i);
+              const rate = getRateForDate(d);
+              return `<div class="p-2 bg-gray-50 rounded">
+                <div class="text-gray-400 text-xs">${d.getMonth()+1}/${d.getDate()}</div>
+                <div class="font-bold text-indigo-600">${rate.toFixed(1)}%</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+        
+        <div class="bg-white rounded-2xl p-5 shadow-sm">
+          <h3 class="font-bold mb-4">🗄️ 데이터베이스</h3>
+          <p class="text-sm text-gray-600 mb-3">Supabase 프로젝트: sniabexwdgeepakkxxek</p>
+          <a href="https://supabase.com/dashboard" target="_blank" class="px-4 py-2 bg-emerald-600 text-white rounded-xl inline-block">Supabase 대시보드</a>
+        </div>
+      </div>
+    `;
+  }
+  
+  h += `
+      </main>
+    </div>
+  `;
+  
+  return h;
+}
+
+// 오늘 쿠팡 확률
+function getTodayRate() {
+  return getRateForDate(new Date());
+}
+
+function getRateForDate(date) {
+  const seed = date.getFullYear() * 10000 + (date.getMonth()+1) * 100 + date.getDate();
+  const x = Math.sin(seed) * 10000;
+  const rand = x - Math.floor(x);
+  return 3 + rand * 7;
+}
+
+// 학원 검색
+function filterAcademies() {
+  const q = document.getElementById('searchAcademy').value.toLowerCase();
+  document.querySelectorAll('.academy-row').forEach(row => {
+    const name = row.dataset.name.toLowerCase();
+    row.style.display = name.includes(q) ? '' : 'none';
+  });
+}
+
+// 학원 상세
+function viewAcademy(id) {
+  const a = academies.find(x => x.id === id);
+  if (!a) return;
+  alert(`학원: ${a.name}\n원장: ${a.owner}\n연락처: ${a.phone || '-'}\n주소: ${a.address || '-'}\n카테고리: ${(a.categories || []).join(', ')}\n요금제: ${a.plan || 'basic'}\n가입일: ${new Date(a.created_at).toLocaleDateString('ko-KR')}`);
+}
+
+// 학원 삭제
+async function deleteAcademy(id) {
+  if (!confirm('정말 이 학원을 삭제하시겠습니까?\n관련된 모든 데이터가 삭제됩니다.')) return;
+  await db.from('academies').delete().eq('id', id);
+  await loadData();
+}
+
+// 광고 모달
+let editingAdId = null;
+
+function openAdModal(id = null) {
+  editingAdId = id;
+  const ad = id ? ads.find(a => a.id === id) : null;
+  
+  const modal = document.createElement('div');
+  modal.id = 'adModal';
+  modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl w-full max-w-md">
+      <div class="p-4 border-b flex justify-between">
+        <span class="font-bold">${ad ? '광고 수정' : '광고 추가'}</span>
+        <button onclick="document.getElementById('adModal').remove()">✕</button>
+      </div>
+      <div class="p-4 space-y-3">
+        <select id="adCategory" class="w-full px-4 py-2 border rounded-xl">
+          <option value="">카테고리 선택</option>
+          ${allCategories.map(c => `<option value="${c}" ${ad?.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+        </select>
+        <input type="text" id="adName" value="${ad?.name || ''}" placeholder="광고명" class="w-full px-4 py-2 border rounded-xl">
+        <input type="url" id="adUrl" value="${ad?.coupang_url || ''}" placeholder="쿠팡 파트너스 URL" class="w-full px-4 py-2 border rounded-xl">
+        <div class="flex gap-2 pt-2">
+          <button onclick="document.getElementById('adModal').remove()" class="flex-1 py-2 border rounded-xl">취소</button>
+          <button onclick="saveAd()" class="flex-1 py-2 bg-indigo-600 text-white rounded-xl">저장</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+}
+
+function editAd(id) {
+  openAdModal(id);
+}
+
+async function saveAd() {
+  const category = document.getElementById('adCategory').value;
+  const name = document.getElementById('adName').value;
+  const coupang_url = document.getElementById('adUrl').value;
+  
+  if (!category) {
+    alert('카테고리를 선택하세요');
+    return;
+  }
+  
+  if (editingAdId) {
+    await db.from('ads').update({ category, name, coupang_url }).eq('id', editingAdId);
+  } else {
+    await db.from('ads').insert({ category, name, coupang_url, active: true });
+  }
+  
+  document.getElementById('adModal').remove();
+  editingAdId = null;
+  await loadData();
+}
+
+async function toggleAd(id, active) {
+  await db.from('ads').update({ active }).eq('id', id);
+  await loadData();
+}
+
+async function deleteAd(id) {
+  if (!confirm('이 광고를 삭제하시겠습니까?')) return;
+  await db.from('ads').delete().eq('id', id);
+  await loadData();
+}
+
+init();
+</script>
+</body>
+</html>

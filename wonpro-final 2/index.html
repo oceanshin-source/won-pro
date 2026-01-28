@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>원생관리 Pro - 학원관리 프로그램 | 출결, 수강료, 문서를 한번에</title>
+  
+  <!-- SEO -->
+  <meta name="description" content="학원장을 위한 올인원 학원관리 솔루션. 원생관리, 출결, 수강료, 학부모 소통까지. 카드결제 수수료 마진 0%.">
+  <meta name="keywords" content="학원관리, 원생관리, 학원프로그램, 학원관리프로그램, 원생관리프로그램, 학원솔루션, 출결관리, 수강료관리, 학원ERP, 클래스픽, 학원탑, 학원매니저, 학원어플, 학원앱, 영어학원, 수학학원, 국어학원, 피아노학원, 미술학원, 음악학원, 태권도, 합기도, 검도, 유도, 무술학원, 발레학원, 댄스학원, 보습학원, 입시학원, 논술학원, 코딩학원, 컴퓨터학원, 바이올린, 첼로, 기타학원, 드럼학원, 보컬학원, 헬스장, PT관리, 필라테스, 요가, 수영장, 골프연습장, 클라이밍, 교습소, 공부방, 과외관리, 학원출결, 학원수납, 학원문자, 학부모알림">
+  <meta name="robots" content="index, follow">
+  <meta property="og:title" content="원생관리 Pro - 학원장을 위한 비서">
+  <meta property="og:description" content="원생관리, 출결, 수강료, 학부모 소통까지. 카드결제 수수료 마진 0%.">
+  <meta property="og:type" content="website">
+  <link rel="canonical" href="https://wonpro.kr/">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { font-family: 'Pretendard', -apple-system, 'Malgun Gothic', sans-serif; }
+    html { scroll-behavior: smooth; }
+    .gradient-text { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero-gradient { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); }
+    .card-hover { transition: all 0.3s; }
+    .card-hover:hover { transform: translateY(-8px); box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+    .feature-icon { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 16px; font-size: 28px; }
+    .price-popular { position: relative; }
+    .price-popular::before { content: '🔥 인기'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #f59e0b; color: white; padding: 4px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+    .screenshot { border-radius: 16px; box-shadow: 0 25px 50px rgba(0,0,0,0.15); }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    .float { animation: float 3s ease-in-out infinite; }
+  </style>
+</head>
+<body class="bg-white">
+
+  <!-- 네비게이션 -->
+  <nav class="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-md z-50 border-b border-gray-100">
+    <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+      <a href="#" class="flex items-center gap-2">
+        <span class="text-2xl">📚</span>
+        <span class="font-bold text-xl">원생관리 Pro</span>
+      </a>
+      <div class="hidden md:flex items-center gap-8">
+        <a href="#features" class="text-gray-600 hover:text-gray-900">기능</a>
+        <a href="#hidden-cost" class="text-gray-600 hover:text-gray-900">비용</a>
+        <a href="#faq" class="text-gray-600 hover:text-gray-900">FAQ</a>
+      </div>
+      <a href="https://open.kakao.com/o/sXKfmBdi" target="_blank" class="px-5 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors">
+        도입 문의
+      </a>
+    </div>
+  </nav>
+
+  <!-- 히어로 섹션 -->
+  <section class="hero-gradient pt-32 pb-20 px-4">
+    <div class="max-w-6xl mx-auto">
+      <div class="grid lg:grid-cols-2 gap-12 items-center">
+        <div class="text-white">
+          <div class="inline-block px-4 py-2 bg-white/20 rounded-full text-sm font-medium mb-6">
+            🎉 학원장을 위한 올인원 솔루션
+          </div>
+          <h1 class="text-4xl lg:text-5xl font-bold leading-tight mb-6">
+            학원 운영,<br>
+            이제 <span class="underline decoration-yellow-300 decoration-4">혼자서도</span> 충분해요
+          </h1>
+          <p class="text-xl text-indigo-100 mb-8 leading-relaxed">
+            원생관리, 출결, 수강료, 학부모 소통까지<br>
+            당신의 든든한 비서가 되어드릴게요.
+          </p>
+          <div class="flex flex-col sm:flex-row gap-4">
+            <a href="demo/" class="px-8 py-4 bg-white text-indigo-600 font-bold rounded-2xl text-center hover:bg-gray-100 transition-colors text-lg">
+              🚀 데모 체험하기
+            </a>
+            <a href="#features" class="px-8 py-4 border-2 border-white/50 text-white font-semibold rounded-2xl text-center hover:bg-white/10 transition-colors">
+              기능 살펴보기
+            </a>
+          </div>
+          <div class="mt-8 flex items-center gap-6 text-indigo-100">
+            <div class="flex items-center gap-2">
+              <span class="text-green-300">✓</span> 설치 필요 없음
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-green-300">✓</span> 5분만에 시작
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-green-300">✓</span> 무료 체험
+            </div>
+          </div>
+        </div>
+        <div class="relative">
+          <div class="bg-white rounded-3xl shadow-2xl p-4 float">
+            <!-- 대시보드 미리보기 -->
+            <div class="bg-gray-50 rounded-2xl p-4">
+              <div class="flex items-center gap-2 mb-4">
+                <div class="w-3 h-3 bg-red-400 rounded-full"></div>
+                <div class="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                <span class="ml-2 text-xs text-gray-400">원생관리 Pro</span>
+              </div>
+              <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-3">
+                  <div class="text-xs opacity-80">전체 원생</div>
+                  <div class="text-2xl font-bold">24명</div>
+                </div>
+                <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl p-3">
+                  <div class="text-xs opacity-80">이번달 매출</div>
+                  <div class="text-2xl font-bold">486만</div>
+                </div>
+                <div class="bg-gradient-to-br from-amber-500 to-orange-500 text-white rounded-xl p-3">
+                  <div class="text-xs opacity-80">오늘 수업</div>
+                  <div class="text-2xl font-bold">8명</div>
+                </div>
+                <div class="bg-gradient-to-br from-rose-500 to-pink-500 text-white rounded-xl p-3">
+                  <div class="text-xs opacity-80">미납</div>
+                  <div class="text-2xl font-bold">2명</div>
+                </div>
+              </div>
+              <div class="bg-white rounded-xl p-3 border">
+                <div class="text-sm font-semibold mb-2">📋 오늘 할 일</div>
+                <div class="space-y-2 text-sm">
+                  <div class="flex items-center gap-2"><span class="text-emerald-500">✓</span><span class="line-through text-gray-400">김민준 출석체크</span></div>
+                  <div class="flex items-center gap-2"><span class="text-gray-300">○</span>박지호 수강료 안내</div>
+                  <div class="flex items-center gap-2"><span class="text-gray-300">○</span>이서연 학부모 상담</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="absolute -bottom-6 -right-6 bg-yellow-400 text-yellow-900 px-4 py-2 rounded-xl font-bold shadow-lg">
+            +카드 결제수수료 추가없음
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+
+  <!-- 문제 → 해결 -->
+  <section class="py-20 px-4">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl lg:text-4xl font-bold mb-4">혹시 이런 고민 있으신가요?</h2>
+        <p class="text-gray-600 text-lg">학원장이라면 누구나 겪는 문제들</p>
+      </div>
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="bg-red-50 border border-red-100 rounded-2xl p-6">
+          <div class="text-4xl mb-4">😰</div>
+          <h3 class="font-bold text-lg mb-2">출결 관리가 힘들어요</h3>
+          <p class="text-gray-600">수기로 적다 보면 놓치는 학생도 있고, 학부모님께 알림 보내는 것도 일이에요.</p>
+        </div>
+        <div class="bg-red-50 border border-red-100 rounded-2xl p-6">
+          <div class="text-4xl mb-4">😤</div>
+          <h3 class="font-bold text-lg mb-2">수강료 미납 관리</h3>
+          <p class="text-gray-600">누가 냈는지 안 냈는지 헷갈리고, 독촉하기도 민망해요.</p>
+        </div>
+        <div class="bg-red-50 border border-red-100 rounded-2xl p-6">
+          <div class="text-4xl mb-4">📝</div>
+          <h3 class="font-bold text-lg mb-2">서류 작업이 너무 많아요</h3>
+          <p class="text-gray-600">재원증명서, 수료증, 영수증... 매번 양식 찾아서 작성하는 게 번거로워요.</p>
+        </div>
+      </div>
+      <div class="text-center mt-12">
+        <div class="inline-block bg-indigo-100 text-indigo-700 px-6 py-3 rounded-full font-semibold">
+          👇 원생관리 Pro가 해결해 드릴게요
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 주요 기능 -->
+  <section id="features" class="py-20 px-4 bg-gray-50">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl lg:text-4xl font-bold mb-4">당신의 <span class="gradient-text">든든한 비서</span>가 되어드릴게요</h2>
+        <p class="text-gray-600 text-lg">학원 운영에 필요한 모든 기능을 한 곳에서</p>
+      </div>
+
+      <!-- 기능 그리드 -->
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        <div class="bg-white rounded-2xl p-6 card-hover border border-gray-100">
+          <div class="feature-icon bg-blue-100 text-blue-600 mb-4">👥</div>
+          <h3 class="font-bold text-lg mb-2">원생 관리</h3>
+          <p class="text-gray-600 text-sm">이름, 연락처, 수강과목, 레벨, 수업시간까지 한눈에 관리하세요.</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 card-hover border border-gray-100">
+          <div class="feature-icon bg-emerald-100 text-emerald-600 mb-4">📅</div>
+          <h3 class="font-bold text-lg mb-2">출결 관리</h3>
+          <p class="text-gray-600 text-sm">터치 한 번으로 출석체크. 학부모님께 자동 알림까지.</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 card-hover border border-gray-100">
+          <div class="feature-icon bg-amber-100 text-amber-600 mb-4">💰</div>
+          <h3 class="font-bold text-lg mb-2">수강료 관리</h3>
+          <p class="text-gray-600 text-sm">미납자 자동 알림, 수납 현황 한눈에. 카드 결제 연동까지.</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 card-hover border border-gray-100">
+          <div class="feature-icon bg-purple-100 text-purple-600 mb-4">📄</div>
+          <h3 class="font-bold text-lg mb-2">문서 자동화</h3>
+          <p class="text-gray-600 text-sm">재원증명서, 수료증, 영수증 등 23종 양식. 원생 정보 자동 입력.</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 card-hover border border-gray-100">
+          <div class="feature-icon bg-rose-100 text-rose-600 mb-4">💬</div>
+          <h3 class="font-bold text-lg mb-2">학부모 소통</h3>
+          <p class="text-gray-600 text-sm">공지사항, 상담 요청, 숙제 안내까지. 학부모 전용 페이지 제공.</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 card-hover border border-gray-100">
+          <div class="feature-icon bg-cyan-100 text-cyan-600 mb-4">📊</div>
+          <h3 class="font-bold text-lg mb-2">통계 & 리포트</h3>
+          <p class="text-gray-600 text-sm">매출, 출석률, 수납률 한눈에. 월별 추이 그래프로 확인.</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 card-hover border border-gray-100">
+          <div class="feature-icon bg-indigo-100 text-indigo-600 mb-4">📱</div>
+          <h3 class="font-bold text-lg mb-2">학생 전용 앱</h3>
+          <p class="text-gray-600 text-sm">숙제 확인, 수업 일정, 출석 현황. 학생도 바로 확인.</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 card-hover border border-gray-100">
+          <div class="feature-icon bg-orange-100 text-orange-600 mb-4">📝</div>
+          <h3 class="font-bold text-lg mb-2">과제 관리</h3>
+          <p class="text-gray-600 text-sm">숙제 등록, 완료 체크. 학생별 과제 현황 한눈에.</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 card-hover border border-gray-100">
+          <div class="feature-icon bg-teal-100 text-teal-600 mb-4">📥</div>
+          <h3 class="font-bold text-lg mb-2">엑셀 내보내기</h3>
+          <p class="text-gray-600 text-sm">원생 목록, 출결 현황, 수납 내역. 클릭 한 번으로 다운로드.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Pro 기능 (학원/헬스장) -->
+  <section class="py-20 px-4">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-16">
+        <div class="inline-block px-4 py-2 bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-full text-sm font-bold mb-4">
+          ⭐ PRO 전용
+        </div>
+        <h2 class="text-3xl lg:text-4xl font-bold mb-4">더 깊은 소통, 더 나은 관리</h2>
+        <p class="text-gray-600 text-lg">Pro 플랜에서만 만나볼 수 있는 특별한 기능들</p>
+      </div>
+
+      <div class="grid lg:grid-cols-2 gap-8">
+        <!-- 학원/교습소 -->
+        <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-3xl p-8 border border-indigo-100">
+          <div class="text-3xl mb-4">🎓</div>
+          <h3 class="text-xl font-bold mb-4">학원 / 교습소</h3>
+          <ul class="space-y-3">
+            <li class="flex items-center gap-3"><span class="text-indigo-500">✓</span>📸 수업 사진/영상 공유</li>
+            <li class="flex items-center gap-3"><span class="text-indigo-500">✓</span>📊 주간/월간 학습 리포트</li>
+            <li class="flex items-center gap-3"><span class="text-indigo-500">✓</span>📅 보강 신청 시스템</li>
+            <li class="flex items-center gap-3"><span class="text-indigo-500">✓</span>💬 실시간 채팅 (학부모 ↔ 선생님)</li>
+            <li class="flex items-center gap-3"><span class="text-indigo-500">✓</span>📝 숙제 제출 (사진 업로드)</li>
+            <li class="flex items-center gap-3"><span class="text-indigo-500">✓</span>🏆 출석 포인트 / 랭킹</li>
+            <li class="flex items-center gap-3"><span class="text-indigo-500">✓</span>🎯 학습 목표 달성률</li>
+          </ul>
+        </div>
+
+        <!-- 헬스장/PT -->
+        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-3xl p-8 border border-emerald-100">
+          <div class="text-3xl mb-4">🏋️</div>
+          <h3 class="text-xl font-bold mb-4">헬스장 / PT</h3>
+          <ul class="space-y-3">
+            <li class="flex items-center gap-3"><span class="text-emerald-500">✓</span>🥗 식단 관리 (사진 + 코멘트)</li>
+            <li class="flex items-center gap-3"><span class="text-emerald-500">✓</span>📏 인바디 기록 (체중, 근육량)</li>
+            <li class="flex items-center gap-3"><span class="text-emerald-500">✓</span>🏋️ 운동 루틴 공유</li>
+            <li class="flex items-center gap-3"><span class="text-emerald-500">✓</span>📸 바디 프로필 월별 비교</li>
+            <li class="flex items-center gap-3"><span class="text-emerald-500">✓</span>💪 PT 잔여 횟수 관리</li>
+            <li class="flex items-center gap-3"><span class="text-emerald-500">✓</span>📆 PT 예약 시스템</li>
+            <li class="flex items-center gap-3"><span class="text-emerald-500">✓</span>📊 운동 통계 리포트</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 사용자별 화면 -->
+  <section class="py-20 px-4 bg-gray-900 text-white">
+    <div class="max-w-6xl mx-auto">
+      
+      <!-- 4개 메인 화면 -->
+      <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div class="bg-gradient-to-br from-blue-600 to-blue-700 rounded-3xl p-6 text-center">
+          <div class="text-4xl mb-3">👨‍💼</div>
+          <h3 class="text-lg font-bold mb-2">원장님</h3>
+          <p class="text-blue-200 text-sm mb-3">학원 운영의 모든 것</p>
+          <div class="bg-white/10 rounded-xl p-3 text-left text-sm space-y-1">
+            <div>📊 대시보드 & 통계</div>
+            <div>👥 원생 관리</div>
+            <div>📅 출결 관리</div>
+            <div>💰 수강료 관리</div>
+            <div>📄 문서 23종</div>
+          </div>
+        </div>
+        <div class="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-3xl p-6 text-center">
+          <div class="text-4xl mb-3">👩‍👧</div>
+          <h3 class="text-lg font-bold mb-2">학부모</h3>
+          <p class="text-emerald-200 text-sm mb-3">우리 아이 학습 현황</p>
+          <div class="bg-white/10 rounded-xl p-3 text-left text-sm space-y-1">
+            <div>✅ 출석 알림</div>
+            <div>📢 공지사항</div>
+            <div>💬 상담 문의</div>
+            <div>💳 수강료 납부</div>
+            <div>📝 숙제 확인</div>
+          </div>
+        </div>
+        <div class="bg-gradient-to-br from-amber-500 to-orange-500 rounded-3xl p-6 text-center">
+          <div class="text-4xl mb-3">👦</div>
+          <h3 class="text-lg font-bold mb-2">학생</h3>
+          <p class="text-amber-100 text-sm mb-3">오늘 할 일 한눈에</p>
+          <div class="bg-white/10 rounded-xl p-3 text-left text-sm space-y-1">
+            <div>📝 숙제 체크</div>
+            <div>📅 수업 일정</div>
+            <div>📢 공지 확인</div>
+            <div>🏆 출석 랭킹</div>
+            <div>🎯 학습 목표</div>
+          </div>
+        </div>
+        <div class="bg-gradient-to-br from-violet-600 to-purple-600 rounded-3xl p-6 text-center">
+          <div class="text-4xl mb-3">👤</div>
+          <h3 class="text-lg font-bold mb-2">성인 수강생</h3>
+          <p class="text-violet-200 text-sm mb-3">내 수강 정보 관리</p>
+          <div class="bg-white/10 rounded-xl p-3 text-left text-sm space-y-1">
+            <div>✅ 출석 현황</div>
+            <div>📅 수업 일정</div>
+            <div>💳 수강료 납부</div>
+            <div>📢 공지 확인</div>
+            <div>💬 상담 문의</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 기능별 스크린샷 -->
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div class="bg-gray-800 rounded-2xl p-4">
+          <div class="bg-gray-700 rounded-xl aspect-video flex items-center justify-center mb-3">
+            <span class="text-3xl">📊</span>
+          </div>
+          <h4 class="font-semibold text-sm">대시보드</h4>
+        </div>
+        <div class="bg-gray-800 rounded-2xl p-4">
+          <div class="bg-gray-700 rounded-xl aspect-video flex items-center justify-center mb-3">
+            <span class="text-3xl">👥</span>
+          </div>
+          <h4 class="font-semibold text-sm">원생 관리</h4>
+        </div>
+        <div class="bg-gray-800 rounded-2xl p-4">
+          <div class="bg-gray-700 rounded-xl aspect-video flex items-center justify-center mb-3">
+            <span class="text-3xl">📅</span>
+          </div>
+          <h4 class="font-semibold text-sm">출결 관리</h4>
+        </div>
+        <div class="bg-gray-800 rounded-2xl p-4">
+          <div class="bg-gray-700 rounded-xl aspect-video flex items-center justify-center mb-3">
+            <span class="text-3xl">💰</span>
+          </div>
+          <h4 class="font-semibold text-sm">수강료</h4>
+        </div>
+        <div class="bg-gray-800 rounded-2xl p-4">
+          <div class="bg-gray-700 rounded-xl aspect-video flex items-center justify-center mb-3">
+            <span class="text-3xl">📄</span>
+          </div>
+          <h4 class="font-semibold text-sm">문서 템플릿</h4>
+        </div>
+        <div class="bg-gray-800 rounded-2xl p-4">
+          <div class="bg-gray-700 rounded-xl aspect-video flex items-center justify-center mb-3">
+            <span class="text-3xl">📱</span>
+          </div>
+          <h4 class="font-semibold text-sm">모바일</h4>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 카드 수수료 절약 강조 -->
+  <section id="hidden-cost" class="py-16 px-4 bg-gradient-to-r from-red-500 to-orange-500 text-white">
+    <div class="max-w-4xl mx-auto text-center">
+      <h2 class="text-3xl lg:text-4xl font-bold mb-6">💸 사용료보다 무서운 건 숨겨진 비용</h2>
+      
+      <div class="bg-white/10 backdrop-blur rounded-3xl p-8 mb-8">
+        <p class="text-xl lg:text-2xl mb-4">
+          타사 프로그램 카드결제 수수료 <span class="font-bold text-yellow-300">1%만 더 올려도</span>
+        </p>
+        <p class="text-2xl lg:text-3xl font-bold mb-2">
+          학원 매출 500만원 기준 <span class="text-yellow-300">매달 5만원</span> (연간 60만원)
+        </p>
+        <p class="text-xl">사용료 내는 겁니다</p>
+        <p class="text-lg text-red-100 mt-4">카드결제수수료 마진 없이 연동해드립니다.</p>
+      </div>
+      
+      <div class="bg-white/10 backdrop-blur rounded-2xl p-6 mb-8 text-left max-w-2xl mx-auto">
+        <p class="text-lg mb-3">
+          ⚠️ <strong>카드결제 리더기(키오스크), 무료문자</strong> 등 각종 무료에는 숨은 비용이 있습니다.
+        </p>
+        <p class="text-lg">
+          ✅ 저희는 <strong>편리하게 연동만</strong> 하고 (문자 건당 원가 노출) <strong>중간 수익 없습니다.</strong>
+        </p>
+      </div>
+      
+      <div class="bg-white rounded-2xl p-6 text-gray-800 max-w-3xl mx-auto mb-6">
+        <table class="w-full">
+          <thead>
+            <tr class="border-b-2">
+              <th class="py-3 text-left w-1/3"></th>
+              <th class="py-3 text-center w-1/3 text-red-500 font-bold">타사 프로그램</th>
+              <th class="py-3 text-center w-1/3 text-indigo-600 font-bold">원생관리 Pro</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-b">
+              <td class="py-4 font-medium text-left">프로그램 비용</td>
+              <td class="py-4 text-center">무료~3만원</td>
+              <td class="py-4 text-center font-bold text-indigo-600">8,900원~</td>
+            </tr>
+            <tr class="border-b">
+              <td class="py-4 font-medium text-left">카드 결제수수료</td>
+              <td class="py-4 text-center text-red-500">추가 마진 있음</td>
+              <td class="py-4 text-center font-bold text-indigo-600">마진 0%<br><span class="text-sm text-gray-500">(소상공인 우대 그대로)</span></td>
+            </tr>
+            <tr class="border-b">
+              <td class="py-4 font-medium text-left">문자 발송</td>
+              <td class="py-4 text-center text-red-500">"무료 500건" 미끼 후<br><span class="text-sm">건당 20~30원 (원가 2~3배)</span></td>
+              <td class="py-4 text-center font-bold text-indigo-600">원가 그대로<br><span class="text-sm text-gray-500">건당 9원~ (마진 0%)</span></td>
+            </tr>
+            <tr class="border-b">
+              <td class="py-4 font-medium text-left">월 매출 1,000만원 기준</td>
+              <td class="py-4 text-center text-red-500">+10만원 이상 손해</td>
+              <td class="py-4 text-center font-bold text-indigo-600">추가 비용 없음</td>
+            </tr>
+            <tr>
+              <td class="py-4 font-medium text-left">연간 비용 차이</td>
+              <td class="py-4 text-center text-red-500 font-bold">약 120만원 ↑</td>
+              <td class="py-4 text-center font-bold text-green-600">120만원 절약!</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- 소상공인 카드수수료 -->
+      <div class="bg-white rounded-2xl p-6 text-gray-800 max-w-3xl mx-auto mb-6">
+        <h4 class="font-bold text-lg mb-4">📋 소상공인 카드수수료 우대 기준</h4>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b-2">
+              <th class="py-2 text-left">연 매출</th>
+              <th class="py-2 text-center">신용카드</th>
+              <th class="py-2 text-center">체크카드</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-b">
+              <td class="py-2 text-left">3억 이하</td>
+              <td class="py-2 text-center font-bold text-indigo-600">0.5%</td>
+              <td class="py-2 text-center font-bold text-indigo-600">0.25%</td>
+            </tr>
+            <tr class="border-b">
+              <td class="py-2 text-left">3억~5억</td>
+              <td class="py-2 text-center font-bold text-indigo-600">1.1%</td>
+              <td class="py-2 text-center font-bold text-indigo-600">0.85%</td>
+            </tr>
+            <tr>
+              <td class="py-2 text-left">5억~10억</td>
+              <td class="py-2 text-center font-bold text-indigo-600">1.25%</td>
+              <td class="py-2 text-center font-bold text-indigo-600">1.0%</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="mt-4 text-red-500 font-bold text-center">
+          ⚠️ 이 이상의 카드수수료를 낸다면, 매달 수십만원 손해보고 계십니다
+        </p>
+      </div>
+      
+      <p class="text-lg">
+        ✅ 카드결제 → 학원 통장 직접 입금 (마진 0%)<br>
+        ✅ 소상공인 우대수수료 그대로 적용<br>
+        ✅ 문자 발송 원가 연동 (마진 0%)<br>
+        ✅ 숨겨진 비용 없이 투명하게
+      </p>
+    </div>
+  </section>
+
+  <!-- 가격 -->
+  <section id="pricing" class="py-20 px-4">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl lg:text-4xl font-bold mb-4">숨겨진 비용 없는 합리적인 가격</h2>
+        <p class="text-gray-600 text-lg">필요한 만큼만 선택하세요</p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        
+        <!-- Basic -->
+        <div class="bg-white rounded-3xl border-2 border-gray-200 p-8 card-hover">
+          <div class="text-center mb-6">
+            <a href="#hidden-cost" class="hover:opacity-80">
+              <h3 class="text-xl font-bold mb-2">Basic</h3>
+              <div class="text-4xl font-bold">8,900<span class="text-lg text-gray-500">원/월</span></div>
+            </a>
+            <p class="text-gray-500 text-sm mt-2">소규모 학원에 딱!</p>
+            <p class="text-red-500 text-xs mt-1 font-medium">타사는 10만원 이상 손해 (월)</p>
+          </div>
+          <ul class="space-y-3 mb-8">
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span>원생 관리 (무제한)</li>
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span>출결 관리</li>
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span>수강료 관리</li>
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span>문서 템플릿 23종</li>
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span>학부모/학생 페이지</li>
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span>공지사항</li>
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span>상담 관리</li>
+            <li class="flex items-center gap-2 text-gray-400"><span>−</span>관련 광고 노출</li>
+          </ul>
+          <a href="demo/" class="block w-full py-3 border-2 border-indigo-600 text-indigo-600 font-semibold rounded-xl text-center hover:bg-indigo-50 transition-colors">
+            데모 체험
+          </a>
+        </div>
+
+        <!-- Pro (인기) -->
+        <div class="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-3xl p-8 card-hover text-white price-popular relative">
+          <div class="text-center mb-6">
+            <a href="#hidden-cost" class="hover:opacity-80">
+              <h3 class="text-xl font-bold mb-2">Pro</h3>
+              <div class="text-4xl font-bold">14,900<span class="text-lg text-indigo-200">원/월</span></div>
+            </a>
+            <p class="text-indigo-200 text-sm mt-2">프리미엄 기능 모두 포함</p>
+            <p class="text-yellow-300 text-xs mt-1 font-medium">타사는 10만원 이상 손해 (월)</p>
+          </div>
+          <ul class="space-y-3 mb-8">
+            <li class="flex items-center gap-2"><span class="text-yellow-300">✓</span>Basic 모든 기능</li>
+            <li class="flex items-center gap-2"><span class="text-yellow-300">✓</span>수업 사진/영상 공유</li>
+            <li class="flex items-center gap-2"><span class="text-yellow-300">✓</span>학습 리포트</li>
+            <li class="flex items-center gap-2"><span class="text-yellow-300">✓</span>보강 신청 시스템</li>
+            <li class="flex items-center gap-2"><span class="text-yellow-300">✓</span>실시간 채팅</li>
+            <li class="flex items-center gap-2"><span class="text-yellow-300">✓</span>출석 포인트 / 랭킹</li>
+            <li class="flex items-center gap-2"><span class="text-yellow-300">✓</span>카카오 알림톡</li>
+            <li class="flex items-center gap-2 text-indigo-200"><span>−</span>관련 광고 노출</li>
+          </ul>
+          <a href="demo/" class="block w-full py-3 bg-white text-indigo-600 font-bold rounded-xl text-center hover:bg-gray-100 transition-colors">
+            데모 체험
+          </a>
+        </div>
+
+        <!-- Business -->
+        <div class="bg-white rounded-3xl border-2 border-gray-200 p-8 card-hover">
+          <div class="text-center mb-6">
+            <a href="#hidden-cost" class="hover:opacity-80">
+              <h3 class="text-xl font-bold mb-2">Business</h3>
+              <div class="text-4xl font-bold">38,900<span class="text-lg text-gray-500">원/월</span></div>
+            </a>
+            <p class="text-gray-500 text-sm mt-2">직원이 있는 학원에</p>
+            <p class="text-red-500 text-xs mt-1 font-medium">타사는 10만원 이상 손해 (월)</p>
+          </div>
+          <ul class="space-y-3 mb-8">
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span>Pro 모든 기능</li>
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span><b>광고 없음</b></li>
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span>직원 계정 (최대 5명)</li>
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span>권한 관리</li>
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span>다지점 관리</li>
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span>직원 근태 관리</li>
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span>급여 관리</li>
+            <li class="flex items-center gap-2"><span class="text-emerald-500">✓</span>전담 매니저</li>
+          </ul>
+          <a href="https://open.kakao.com/o/sXKfmBdi" target="_blank" class="block w-full py-3 border-2 border-indigo-600 text-indigo-600 font-semibold rounded-xl text-center hover:bg-indigo-50 transition-colors">
+            도입 문의
+          </a>
+        </div>
+
+      </div>
+
+      <p class="text-center text-gray-500 mt-8">모든 플랜 데모 체험 가능 · 언제든 해지 가능</p>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="py-20 px-4 bg-gray-50">
+    <div class="max-w-3xl mx-auto">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl lg:text-4xl font-bold mb-4">자주 묻는 질문</h2>
+      </div>
+
+      <div class="space-y-4">
+        <div class="bg-white rounded-2xl border p-6">
+          <h4 class="font-bold mb-2">설치가 필요한가요?</h4>
+          <p class="text-gray-600">아니요! 웹 브라우저에서 바로 사용할 수 있습니다. 컴퓨터, 태블릿, 스마트폰 어디서든 접속 가능해요.</p>
+        </div>
+        <div class="bg-white rounded-2xl border p-6">
+          <h4 class="font-bold mb-2">학부모/학생은 어떻게 접속하나요?</h4>
+          <p class="text-gray-600">학원 전용 링크를 공유해 주세요. 전화번호 뒤 4자리로 간편 로그인할 수 있어요.</p>
+        </div>
+        <div class="bg-white rounded-2xl border p-6">
+          <h4 class="font-bold mb-2">결제는 어떻게 되나요?</h4>
+          <p class="text-gray-600">학부모가 수강료를 결제하면 학원 통장으로 직접 입금됩니다. 포트원(구 아임포트) 연동으로 안전하게 처리돼요.</p>
+        </div>
+        <div class="bg-white rounded-2xl border p-6">
+          <h4 class="font-bold mb-2">데이터는 안전한가요?</h4>
+          <p class="text-gray-600">SSL 암호화, 정기 백업으로 안전하게 보관됩니다. 개인정보보호법을 준수해요.</p>
+        </div>
+        <div class="bg-white rounded-2xl border p-6">
+          <h4 class="font-bold mb-2">해지하면 데이터는요?</h4>
+          <p class="text-gray-600">해지 전 엑셀로 모든 데이터를 다운로드할 수 있어요. 해지 후 30일간 데이터를 보관합니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="py-20 px-4 hero-gradient text-white">
+    <div class="max-w-3xl mx-auto text-center">
+      <h2 class="text-3xl lg:text-4xl font-bold mb-6">지금 바로 체험해보세요</h2>
+      <p class="text-xl text-indigo-100 mb-8">데모에서 모든 기능을 직접 확인하세요</p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="demo/" class="inline-block px-10 py-4 bg-white text-indigo-600 font-bold rounded-2xl text-lg hover:bg-gray-100 transition-colors">
+          🚀 데모 체험하기
+        </a>
+        <a href="https://open.kakao.com/o/sXKfmBdi" target="_blank" class="inline-block px-10 py-4 border-2 border-white text-white font-bold rounded-2xl text-lg hover:bg-white/10 transition-colors">
+          📞 도입 문의
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 푸터 -->
+  <footer class="bg-gray-900 text-gray-400 py-12 px-4">
+    <div class="max-w-6xl mx-auto">
+      <div class="grid md:grid-cols-4 gap-8 mb-8">
+        <div>
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-2xl">📚</span>
+            <span class="font-bold text-xl text-white">원생관리 Pro</span>
+          </div>
+          <p class="text-sm">학원장을 위한<br>올인원 학원관리 솔루션</p>
+        </div>
+        <div>
+          <h4 class="font-semibold text-white mb-4">서비스</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="#features" class="hover:text-white">기능 소개</a></li>
+            <li><a href="#pricing" class="hover:text-white">가격 안내</a></li>
+            <li><a href="demo/" class="hover:text-white">무료 체험</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="font-semibold text-white mb-4">고객지원</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="#faq" class="hover:text-white">자주 묻는 질문</a></li>
+            <li><a href="#" class="hover:text-white">이용 가이드</a></li>
+            <li><a href="https://open.kakao.com/o/sXKfmBdi" target="_blank" class="hover:text-white">문의하기</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="font-semibold text-white mb-4">법적 고지</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="#" class="hover:text-white">이용약관</a></li>
+            <li><a href="#" class="hover:text-white">개인정보처리방침</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="border-t border-gray-800 pt-8 text-sm">
+        <div class="text-center mb-4">
+          <p>© 2025 원생관리 Pro. All rights reserved.</p>
+        </div>
+        <div class="text-gray-500 text-xs space-y-1">
+          <p><strong class="text-gray-400">상호명:</strong> 이든 | <strong class="text-gray-400">대표자:</strong> 박희숙 | <strong class="text-gray-400">사업자등록번호:</strong> 655-61-00946</p>
+          <p><strong class="text-gray-400">사업장주소:</strong> 인천광역시 연수구 하모니로178번길 22, 7층 707-마41호(송도동)</p>
+          <p><strong class="text-gray-400">전화번호:</strong> 032-670-9224 | <strong class="text-gray-400">통신판매업번호:</strong> 제0000-인천연수-0000호</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

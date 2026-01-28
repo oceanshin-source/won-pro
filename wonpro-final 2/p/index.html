@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>학부모 페이지</title>
+  
+  <!-- PWA -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#10b981">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{font-family:-apple-system,'Malgun Gothic',sans-serif;box-sizing:border-box}
+    .tab-active{color:#10b981;border-bottom:2px solid #10b981}
+  </style>
+</head>
+<body class="bg-gray-50">
+<div id="app"></div>
+<script>
+const SUPABASE_URL = 'https://sniabexwdgeepakkxxek.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuaWFiZXh3ZGdlZXBha2t4eGVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MDMxNzIsImV4cCI6MjA4NTA3OTE3Mn0.RsDQDyawjFk5voFLVouXDlTIXvhPrsziCD37ne-1jMU';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// URL에서 학원 코드 가져오기 (wonpro.pages.dev/p/ABC123)
+const pathParts = window.location.pathname.split('/');
+const academyCode = pathParts[pathParts.length - 1] || pathParts[pathParts.length - 2];
+
+let page = 'login';
+let academy = null;
+let student = null;
+let tab = 'home';
+let notices = [];
+let attendance = [];
+let photos = [];
+let reports = [];
+let makeups = [];
+let consults = [];
+let loading = false;
+
+// 쿠팡 광고 로직 (3~10% 랜덤)
+function getCoupangRate() {
+  const today = new Date();
+  const seed = today.getFullYear() * 10000 + (today.getMonth()+1) * 100 + today.getDate();
+  const x = Math.sin(seed) * 10000;
+  const rand = x - Math.floor(x);
+  return 3 + rand * 7; // 3.xx ~ 9.xx%
+}
+
+function tryCoupangCookie(categories) {
+  const rate = getCoupangRate();
+  if (Math.random() * 100 < rate) {
+    // 카테고리별 쿠팡 링크 (추후 DB에서 가져오기)
+    const defaultUrl = 'https://link.coupang.com/a/example';
+    window.open(defaultUrl, '_blank');
+  }
+}
+
+// 초기화
+async function init() {
+  if (!academyCode || academyCode === 'p') {
+    document.getElementById('app').innerHTML = '<div class="min-h-screen flex items-center justify-center text-gray-500">잘못된 접근입니다</div>';
+    return;
+  }
+  
+  const { data } = await db.from('academies').select('*').eq('code', academyCode).single();
+  if (!data) {
+    document.getElementById('app').innerHTML = '<div class="min-h-screen flex items-center justify-center text-gray-500">학원을 찾을 수 없습니다</div>';
+    return;
+  }
+  
+  // 학부모 접속 허용 체크
+  if (data.allow_parent === false) {
+    document.getElementById('app').innerHTML = '<div class="min-h-screen flex items-center justify-center text-gray-500"><div class="text-center"><div class="text-4xl mb-4">🚫</div><p>현재 학부모 접속이 제한되어 있습니다.</p><p class="text-sm mt-2">학원에 문의해주세요.</p></div></div>';
+    return;
+  }
+  
+  academy = data;
+  render();
+}
+
+// 로그인
+async function login() {
+  const phone = document.getElementById('phone').value.trim();
+  if (phone.length !== 4) {
+    alert('전화번호 뒤 4자리를 입력하세요');
+    return;
+  }
+  
+  loading = true;
+  render();
+  
+  const { data, error } = await db.from('students')
+    .select('*')
+    .eq('academy_id', academy.id)
+    .like('pPhone', `%${phone}`)
+    .single();
+  
+  if (error || !data) {
+    alert('등록된 정보를 찾을 수 없습니다');
+    loading = false;
+    render();
+    return;
+  }
+  
+  // 개별 차단 체크
+  if (data.blocked) {
+    alert('접속이 제한되었습니다. 학원에 문의해주세요.');
+    loading = false;
+    render();
+    return;
+  }
+  
+  student = data;
+  
+  // 쿠팡 쿠키 심기 시도
+  tryCoupangCookie(academy.categories);
+  
+  await loadData();
+  loading = false;
+  page = 'main';
+  render();
+}
+
+// 데이터 로드
+async function loadData() {
+  const { data: n } = await db.from('notices').select('*').eq('academy_id', academy.id).order('created_at', { ascending: false }).limit(10);
+  notices = n || [];
+  
+  const { data: a } = await db.from('attendance').select('*').eq('student_id', student.id).order('date', { ascending: false }).limit(30);
+  attendance = a || [];
+  
+  const { data: p } = await db.from('photos').select('*').eq('student_id', student.id).order('created_at', { ascending: false });
+  photos = p || [];
+  
+  const { data: r } = await db.from('reports').select('*').eq('student_id', student.id).order('created_at', { ascending: false });
+  reports = r || [];
+  
+  const { data: m } = await db.from('makeups').select('*').eq('student_id', student.id).order('created_at', { ascending: false });
+  makeups = m || [];
+  
+  const { data: c } = await db.from('consults').select('*').eq('student_id', student.id).order('created_at', { ascending: false });
+  consults = c || [];
+}
+
+// 렌더
+function render() {
+  const app = document.getElementById('app');
+  
+  if (page === 'login') {
+    app.innerHTML = renderLogin();
+  } else {
+    app.innerHTML = renderMain();
+  }
+}
+
+// 로그인 페이지
+function renderLogin() {
+  return `
+    <div class="min-h-screen flex flex-col">
+      <!-- 광고 영역 -->
+      <div class="bg-amber-50 p-3 text-center text-sm">
+        <a href="https://link.coupang.com/a/example" target="_blank" class="text-amber-800">
+          📚 학습에 필요한 교재를 쿠팡에서 확인하세요!
+        </a>
+      </div>
+      
+      <div class="flex-1 flex items-center justify-center p-6">
+        <div class="w-full max-w-sm">
+          <div class="text-center mb-8">
+            <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span class="text-4xl">👩‍👧</span>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800">${academy?.name || '학원'}</h1>
+            <p class="text-gray-500 mt-1">학부모 페이지</p>
+          </div>
+          
+          <div class="bg-white rounded-2xl shadow-lg p-6">
+            <label class="text-sm text-gray-600 block mb-2">보호자 전화번호 뒤 4자리</label>
+            <input type="tel" id="phone" maxlength="4" placeholder="0000" 
+              class="w-full text-center text-3xl tracking-widest py-4 border-2 rounded-xl focus:border-emerald-500 focus:outline-none"
+              onkeypress="if(event.key==='Enter')login()">
+            <button onclick="login()" 
+              class="w-full mt-4 py-4 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-colors"
+              ${loading ? 'disabled' : ''}>
+              ${loading ? '로그인 중...' : '로그인'}
+            </button>
+          </div>
+          
+          <p class="text-center text-gray-400 text-sm mt-6">
+            등록된 전화번호로 로그인할 수 있습니다
+          </p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// 메인 페이지
+function renderMain() {
+  const tabs = [
+    { id: 'home', icon: '🏠', label: '홈' },
+    { id: 'community', icon: '📋', label: '커뮤니티' },
+    { id: 'attendance', icon: '📅', label: '출결' },
+    { id: 'notices', icon: '📢', label: '공지' },
+    { id: 'consult', icon: '💬', label: '상담' }
+  ];
+  
+  let h = `
+    <div class="min-h-screen pb-20">
+      <!-- 헤더 -->
+      <div class="bg-emerald-500 text-white p-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="text-sm opacity-80">${academy.name}</div>
+            <div class="text-xl font-bold">${student.name} 학부모님</div>
+          </div>
+          <button onclick="logout()" class="px-3 py-1 bg-white/20 rounded-lg text-sm">로그아웃</button>
+        </div>
+      </div>
+  `;
+  
+  // 홈
+  if (tab === 'home') {
+    const todayAtt = attendance[0];
+    const unpaid = !student.paid;
+    const scheduleStr = student.schedule ? Object.entries(student.schedule).map(([d,t])=>`${d} ${t}`).join(', ') : '-';
+    
+    h += `
+      <div class="p-4 space-y-4">
+        <!-- 출결 상태 -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold">📅 오늘 출결</h3>
+            <span class="px-3 py-1 rounded-full text-sm ${todayAtt ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}">
+              ${todayAtt ? '✓ 출석완료' : '미출석'}
+            </span>
+          </div>
+          <div class="text-sm text-gray-500">수업 일정: ${scheduleStr}</div>
+        </div>
+        
+        <!-- 수강료 -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="font-bold">💰 수강료</h3>
+              <div class="text-2xl font-bold mt-1">${(student.fee || 0).toLocaleString()}원</div>
+            </div>
+            <div class="text-right">
+              ${unpaid 
+                ? `<span class="px-3 py-1 bg-red-100 text-red-600 rounded-full text-sm">미납</span>
+                   <button onclick="requestPayment()" class="mt-2 block px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm">납부하기</button>`
+                : `<span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm">납부완료</span>`
+              }
+            </div>
+          </div>
+        </div>
+        
+        <!-- 최근 공지 -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm">
+          <h3 class="font-bold mb-3">📢 최근 공지</h3>
+          ${notices.length 
+            ? notices.slice(0, 2).map(n => `
+                <div class="py-2 border-b last:border-0">
+                  <div class="font-medium text-sm">${n.title}</div>
+                  <div class="text-xs text-gray-400">${new Date(n.created_at).toLocaleDateString('ko-KR')}</div>
+                </div>
+              `).join('')
+            : '<p class="text-gray-400 text-sm">공지사항이 없습니다</p>'
+          }
+        </div>
+        
+        <!-- 출석 포인트 -->
+        <div class="bg-gradient-to-r from-amber-400 to-orange-400 rounded-2xl p-5 text-white">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="font-bold">🏆 출석 포인트</h3>
+              <div class="text-3xl font-bold mt-1">${student.points || 0}점</div>
+            </div>
+            <div class="text-5xl">🎯</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  // 출결
+  else if (tab === 'attendance') {
+    h += `
+      <div class="p-4">
+        <h2 class="font-bold text-lg mb-4">📅 출결 기록</h2>
+        <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+          ${attendance.length
+            ? attendance.map(a => `
+                <div class="flex items-center justify-between p-4 border-b">
+                  <div>${a.date}</div>
+                  <span class="px-3 py-1 rounded-full text-sm ${a.status === '출석' ? 'bg-emerald-100 text-emerald-700' : a.status === '지각' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}">
+                    ${a.status}
+                  </span>
+                </div>
+              `).join('')
+            : '<p class="p-4 text-gray-400 text-center">출결 기록이 없습니다</p>'
+          }
+        </div>
+      </div>
+    `;
+  }
+  
+  // 커뮤니티
+  else if (tab === 'community') {
+    h += `
+      <div class="p-4">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="font-bold text-lg">📋 커뮤니티</h2>
+          <button onclick="openWritePost()" class="px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-sm">✏️ 글쓰기</button>
+        </div>
+        
+        <!-- 투표 -->
+        <div class="bg-violet-50 rounded-2xl p-4 mb-4">
+          <h3 class="font-bold text-violet-700 mb-3">🗳️ 진행중인 투표</h3>
+          <div class="bg-white rounded-xl p-4">
+            <div class="font-medium mb-2">2월 보강 희망 요일</div>
+            <div class="space-y-2">
+              ${['월요일','화요일','수요일','토요일'].map((opt,i) => {
+                const votes = [3,5,2,8][i];
+                const total = 18;
+                const pct = Math.round(votes/total*100);
+                return `<button onclick="vote(${i})" class="w-full relative">
+                  <div class="absolute inset-0 bg-violet-100 rounded-lg" style="width:${pct}%"></div>
+                  <div class="relative flex justify-between items-center p-2 text-sm">
+                    <span>${opt}</span>
+                    <span class="text-violet-600">${pct}%</span>
+                  </div>
+                </button>`;
+              }).join('')}
+            </div>
+            <div class="text-xs text-gray-400 mt-2">18명 참여 · 2/5 마감</div>
+          </div>
+        </div>
+        
+        <!-- 게시글 -->
+        <div class="space-y-3">
+          <div class="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-emerald-400">
+            <div class="text-xs text-emerald-600 font-bold mb-1">📌 고정</div>
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-sm">김</div>
+              <div>
+                <div class="font-medium text-sm">김영어 원장</div>
+                <div class="text-xs text-gray-400">1주 전</div>
+              </div>
+            </div>
+            <p class="text-sm">우리 학원 커뮤니티에 오신 것을 환영합니다! 🎉</p>
+            <div class="flex gap-4 mt-3 text-sm text-gray-500">
+              <button onclick="likePost('1')">❤️ 5</button>
+              <button onclick="viewComments('1')">💬 3</button>
+            </div>
+          </div>
+          
+          <div class="bg-white rounded-2xl p-4 shadow-sm">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-sm">학</div>
+              <div>
+                <div class="font-medium text-sm">다른 학부모님</div>
+                <div class="text-xs text-gray-400">2시간 전</div>
+              </div>
+            </div>
+            <p class="text-sm">오늘 아이가 학원 다녀와서 영어로 인사하네요 ㅎㅎ 감사합니다!</p>
+            <div class="flex gap-4 mt-3 text-sm text-gray-500">
+              <button onclick="likePost('2')">❤️ 8</button>
+              <button onclick="viewComments('2')">💬 2</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 일정/자료 바로가기 -->
+        <div class="grid grid-cols-2 gap-3 mt-4">
+          <button onclick="viewEvents()" class="bg-cyan-50 rounded-xl p-4 text-left">
+            <div class="text-2xl mb-1">📅</div>
+            <div class="font-medium text-sm">일정</div>
+            <div class="text-xs text-gray-500">다가오는 행사</div>
+          </button>
+          <button onclick="viewMaterials()" class="bg-emerald-50 rounded-xl p-4 text-left">
+            <div class="text-2xl mb-1">📚</div>
+            <div class="font-medium text-sm">자료실</div>
+            <div class="text-xs text-gray-500">학습 자료</div>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+  
+  // 공지
+  else if (tab === 'notices') {
+    h += `
+      <div class="p-4">
+        <h2 class="font-bold text-lg mb-4">📢 공지사항</h2>
+        <div class="space-y-3">
+          ${notices.length
+            ? notices.map(n => `
+                <div class="bg-white rounded-2xl p-4 shadow-sm">
+                  <div class="font-bold">${n.title}</div>
+                  <div class="text-sm text-gray-600 mt-2">${n.content || ''}</div>
+                  <div class="text-xs text-gray-400 mt-2">${new Date(n.created_at).toLocaleDateString('ko-KR')}</div>
+                </div>
+              `).join('')
+            : '<p class="text-gray-400 text-center py-8">공지사항이 없습니다</p>'
+          }
+        </div>
+      </div>
+    `;
+  }
+  
+  // 사진
+  else if (tab === 'photos') {
+    h += `
+      <div class="p-4">
+        <h2 class="font-bold text-lg mb-4">📸 수업 사진</h2>
+        ${photos.length
+          ? `<div class="grid grid-cols-2 gap-3">
+              ${photos.map(p => `
+                <div class="bg-white rounded-xl overflow-hidden shadow-sm">
+                  <img src="${p.url}" class="w-full h-32 object-cover">
+                  <div class="p-2">
+                    <div class="text-xs text-gray-400">${new Date(p.created_at).toLocaleDateString('ko-KR')}</div>
+                    ${p.caption ? `<div class="text-sm mt-1">${p.caption}</div>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>`
+          : '<p class="text-gray-400 text-center py-8">수업 사진이 없습니다</p>'
+        }
+      </div>
+    `;
+  }
+  
+  // 상담
+  else if (tab === 'consult') {
+    h += `
+      <div class="p-4">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="font-bold text-lg">💬 상담 문의</h2>
+          <button onclick="openConsultModal()" class="px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm">문의하기</button>
+        </div>
+        <div class="space-y-3">
+          ${consults.length
+            ? consults.map(c => `
+                <div class="bg-white rounded-2xl p-4 shadow-sm">
+                  <div class="flex justify-between items-start mb-2">
+                    <div class="font-medium">${c.title || '문의'}</div>
+                    <span class="px-2 py-1 rounded text-xs ${c.status === '완료' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${c.status}</span>
+                  </div>
+                  <div class="text-sm text-gray-600">${c.content}</div>
+                  ${c.reply ? `<div class="mt-2 p-2 bg-gray-50 rounded text-sm"><strong>답변:</strong> ${c.reply}</div>` : ''}
+                  <div class="text-xs text-gray-400 mt-2">${new Date(c.created_at).toLocaleDateString('ko-KR')}</div>
+                </div>
+              `).join('')
+            : '<p class="text-gray-400 text-center py-8">상담 내역이 없습니다</p>'
+          }
+        </div>
+      </div>
+    `;
+  }
+  
+  // 하단 탭
+  h += `
+      <nav class="fixed bottom-0 left-0 right-0 bg-white border-t flex">
+        ${tabs.map(t => `
+          <button onclick="tab='${t.id}';render()" class="flex-1 py-3 text-center ${tab === t.id ? 'text-emerald-500' : 'text-gray-400'}">
+            <div class="text-xl">${t.icon}</div>
+            <div class="text-xs">${t.label}</div>
+          </button>
+        `).join('')}
+      </nav>
+    </div>
+  `;
+  
+  return h;
+}
+
+function logout() {
+  student = null;
+  page = 'login';
+  tab = 'home';
+  render();
+}
+
+function requestPayment() {
+  alert('결제 기능은 준비 중입니다.\n학원에 직접 문의해주세요.');
+}
+
+function openConsultModal() {
+  const title = prompt('문의 제목:');
+  if (!title) return;
+  const content = prompt('문의 내용:');
+  if (!content) return;
+  
+  submitConsult(title, content);
+}
+
+async function submitConsult(title, content) {
+  await db.from('consults').insert({
+    student_id: student.id,
+    title,
+    content,
+    status: '대기'
+  });
+  
+  await loadData();
+  render();
+  alert('문의가 등록되었습니다.');
+}
+
+// 커뮤니티 함수들
+function openWritePost() {
+  const content = prompt('글 내용을 입력하세요:');
+  if (!content) return;
+  submitPost(content);
+}
+
+async function submitPost(content) {
+  await db.from('posts').insert({
+    academy_id: academy.id,
+    author_type: 'parent',
+    author_name: student.name + ' 학부모',
+    content
+  });
+  alert('글이 등록되었습니다.');
+}
+
+function likePost(id) {
+  alert('좋아요!');
+}
+
+function viewComments(id) {
+  alert('댓글 보기 (개발중)');
+}
+
+function vote(optionIndex) {
+  alert('투표 완료!');
+}
+
+function viewEvents() {
+  alert('일정 보기 (개발중)');
+}
+
+function viewMaterials() {
+  alert('자료실 (개발중)');
+}
+
+init();
+</script>
+</body>
+
+<footer class="bg-gray-100 border-t p-4 text-xs text-gray-500 text-center space-y-1 mt-8">
+  <p><strong>상호명:</strong> 이든 | <strong>대표자:</strong> 박희숙 | <strong>사업자등록번호:</strong> 655-61-00946</p>
+  <p><strong>사업장주소:</strong> 인천광역시 연수구 하모니로178번길 22, 7층 707-마41호(송도동)</p>
+  <p><strong>전화번호:</strong> 032-670-9224 | <strong>통신판매업번호:</strong> 제0000-인천연수-0000호</p>
+</footer>
+</html>
