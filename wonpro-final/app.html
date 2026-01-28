@@ -76,6 +76,7 @@ let materials = [];
 let suggestions = [];
 let viewPostId = null;
 let editingPostId = null;
+let communityExpanded = false;
 
 // Business 변수
 let staff = [];
@@ -431,18 +432,21 @@ function renderMain(){
   const revenue = students.filter(s=>s.paid).reduce((a,s)=>a+(s.fee||0),0);
   const pendingConsults = consults.filter(c=>c.status==='대기');
   const pendingMakeups = makeups.filter(m=>m.status==='대기');
+  const pendingSuggestions = suggestions.filter(s=>!s.reply).length;
 
   const menus = [
     {id:'dashboard',icon:'📊',label:'대시보드'},
     {id:'students',icon:'👥',label:'원생관리'},
     {id:'attendance',icon:'📅',label:'출결관리'},
     {id:'payments',icon:'💰',label:'수강료'},
-    {id:'community',icon:'📋',label:'커뮤니티'},
-    {id:'polls',icon:'🗳️',label:'투표'},
-    {id:'events',icon:'📅',label:'일정'},
-    {id:'birthday',icon:'🎉',label:'생일'},
-    {id:'materials',icon:'📚',label:'자료실'},
-    {id:'suggestions',icon:'💡',label:'건의함'},
+    {id:'communityGroup',icon:'📋',label:'커뮤니티',expandable:true,badge:pendingSuggestions,children:[
+      {id:'community',icon:'📝',label:'게시판'},
+      {id:'polls',icon:'🗳️',label:'투표'},
+      {id:'events',icon:'📅',label:'일정'},
+      {id:'birthday',icon:'🎉',label:'생일'},
+      {id:'materials',icon:'📚',label:'자료실'},
+      {id:'suggestions',icon:'💡',label:'건의함',badge:pendingSuggestions}
+    ]},
     {id:'photos',icon:'📸',label:'수업사진',pro:true},
     {id:'reports',icon:'📈',label:'학습리포트',pro:true},
     {id:'makeups',icon:'🔄',label:'보강신청',pro:true,badge:pendingMakeups.length},
@@ -459,6 +463,10 @@ function renderMain(){
     {id:'settings',icon:'⚙️',label:'설정'}
   ];
 
+  // 커뮤니티 탭 체크
+  const communityTabs = ['community','polls','events','birthday','materials','suggestions'];
+  const isCommunityTab = communityTabs.includes(tab);
+
   let h = '<div class="flex min-h-screen">';
   
   // 사이드바
@@ -466,11 +474,30 @@ function renderMain(){
     <div class="p-4 border-b"><div class="flex items-center gap-3"><span class="text-2xl">📚</span><div><div class="font-bold">${academy.name}</div><div class="text-xs text-gray-400">${academy.owner}${isDemo?' · <span class="text-amber-500">🎮 데모</span>':''}</div></div></div></div>
     <nav class="flex-1 py-2 overflow-y-auto">`;
   menus.forEach(m=>{
-    const cls = tab===m.id ? 'active bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50';
-    const badge = m.badge ? `<span class="ml-auto bg-red-500 text-white text-xs px-2 rounded-full">${m.badge}</span>` : '';
-    const proTag = m.pro ? '<span class="ml-1 px-1 py-0.5 bg-indigo-100 text-indigo-600 text-xs rounded">Pro</span>' : '';
-    const bizTag = m.biz ? '<span class="ml-1 px-1 py-0.5 bg-purple-100 text-purple-600 text-xs rounded">Biz</span>' : '';
-    h += `<button onclick="tab='${m.id}';viewStudentId=null;render()" class="sidebar-item w-full px-4 py-3 flex items-center gap-3 text-left ${cls}">${m.icon} ${m.label}${proTag}${bizTag}${badge}</button>`;
+    if(m.expandable){
+      // 펼쳐지는 그룹 메뉴
+      const isOpen = isCommunityTab || communityExpanded;
+      const hasActive = m.children.some(c=>c.id===tab);
+      const badge = m.badge ? `<span class="ml-auto bg-red-500 text-white text-xs px-2 rounded-full">${m.badge}</span>` : '';
+      h += `<button onclick="communityExpanded=!communityExpanded;render()" class="w-full px-4 py-3 flex items-center gap-3 text-left ${hasActive?'text-indigo-600':'text-gray-600 hover:bg-gray-50'}">
+        ${m.icon} ${m.label}
+        ${badge}
+        <span class="ml-auto text-gray-400">${isOpen?'▼':'▶'}</span>
+      </button>`;
+      if(isOpen){
+        m.children.forEach(c=>{
+          const cls = tab===c.id ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50';
+          const childBadge = c.badge ? `<span class="ml-auto bg-red-500 text-white text-xs px-2 rounded-full">${c.badge}</span>` : '';
+          h += `<button onclick="tab='${c.id}';viewStudentId=null;render()" class="w-full pl-10 pr-4 py-2 flex items-center gap-2 text-left text-sm ${cls}">${c.icon} ${c.label}${childBadge}</button>`;
+        });
+      }
+    } else {
+      const cls = tab===m.id ? 'active bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50';
+      const badge = m.badge ? `<span class="ml-auto bg-red-500 text-white text-xs px-2 rounded-full">${m.badge}</span>` : '';
+      const proTag = m.pro ? '<span class="ml-1 px-1 py-0.5 bg-indigo-100 text-indigo-600 text-xs rounded">Pro</span>' : '';
+      const bizTag = m.biz ? '<span class="ml-1 px-1 py-0.5 bg-purple-100 text-purple-600 text-xs rounded">Biz</span>' : '';
+      h += `<button onclick="tab='${m.id}';viewStudentId=null;render()" class="sidebar-item w-full px-4 py-3 flex items-center gap-3 text-left ${cls}">${m.icon} ${m.label}${proTag}${bizTag}${badge}</button>`;
+    }
   });
   h += `</nav><div class="p-4 border-t"><button onclick="logout()" class="text-gray-500 text-sm">${isDemo?'← 데모 나가기':'로그아웃'}</button></div></aside>`;
 
@@ -480,15 +507,17 @@ function renderMain(){
   h += `<header class="bg-white border-b sticky top-0 z-10">
     <div class="px-4 h-14 flex items-center justify-between">
       <div class="flex items-center gap-2 lg:hidden"><span>📚</span><span class="font-bold">${academy.name}</span>${isDemo?'<span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">데모</span>':''}</div>
-      <div class="hidden lg:block font-bold">${viewStudentId ? '원생 상세' : menus.find(m=>m.id===tab)?.label||''}</div>
+      <div class="hidden lg:block font-bold">${viewStudentId ? '원생 상세' : menus.find(m=>m.id===tab || m.children?.some(c=>c.id===tab))?.label||''}</div>
       <div class="flex gap-2">
         <button onclick="openAddStudent()" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg">+원생</button>
         <button onclick="logout()" class="lg:hidden text-gray-500 text-sm">${isDemo?'나가기':'로그아웃'}</button>
       </div>
     </div>
     <div class="lg:hidden flex border-t overflow-x-auto">`;
-  menus.slice(0,6).forEach(m=>{
-    h += `<button onclick="tab='${m.id}';render()" class="px-4 py-2 text-sm whitespace-nowrap border-b-2 ${tab===m.id?'border-indigo-600 text-indigo-600':'border-transparent text-gray-500'}">${m.icon}</button>`;
+  const mobileMenus = [{id:'dashboard',icon:'📊'},{id:'students',icon:'👥'},{id:'attendance',icon:'📅'},{id:'payments',icon:'💰'},{id:'community',icon:'📋'},{id:'notices',icon:'📢'}];
+  mobileMenus.forEach(m=>{
+    const isActive = tab===m.id || (m.id==='community' && communityTabs.includes(tab));
+    h += `<button onclick="tab='${m.id}';render()" class="px-4 py-2 text-sm whitespace-nowrap border-b-2 ${isActive?'border-indigo-600 text-indigo-600':'border-transparent text-gray-500'}">${m.icon}</button>`;
   });
   h += '</div></header>';
 
