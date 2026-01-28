@@ -181,8 +181,8 @@ function renderLogin() {
 function renderMain() {
   const tabs = [
     { id: 'home', icon: '🏠', label: '홈' },
+    { id: 'community', icon: '📋', label: '커뮤니티' },
     { id: 'homework', icon: '📝', label: '숙제' },
-    { id: 'attendance', icon: '📅', label: '출결' },
     { id: 'ranking', icon: '🏆', label: '랭킹' }
   ];
   
@@ -248,6 +248,88 @@ function renderMain() {
               `).join('')
             : '<p class="text-gray-400 text-sm">공지사항이 없습니다</p>'
           }
+        </div>
+      </div>
+    `;
+  }
+  
+  // 커뮤니티
+  else if (tab === 'community') {
+    h += `
+      <div class="p-4">
+        <h2 class="font-bold text-lg mb-4">📋 커뮤니티</h2>
+        
+        <!-- 투표 -->
+        <div class="bg-violet-50 rounded-2xl p-4 mb-4">
+          <h3 class="font-bold text-violet-700 mb-3">🗳️ 투표 참여하기</h3>
+          <div class="bg-white rounded-xl p-4">
+            <div class="font-medium mb-2">2월 보강 희망 요일</div>
+            <div class="space-y-2">
+              ${['월요일','화요일','수요일','토요일'].map((opt,i) => {
+                const votes = [3,5,2,8][i];
+                const total = 18;
+                const pct = Math.round(votes/total*100);
+                return `<button onclick="vote(${i})" class="w-full relative">
+                  <div class="absolute inset-0 bg-violet-100 rounded-lg" style="width:${pct}%"></div>
+                  <div class="relative flex justify-between items-center p-2 text-sm">
+                    <span>${opt}</span>
+                    <span class="text-violet-600">${pct}%</span>
+                  </div>
+                </button>`;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+        
+        <!-- 게시글 (학생은 읽기만) -->
+        <div class="space-y-3">
+          <div class="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-amber-400">
+            <div class="text-xs text-amber-600 font-bold mb-1">📌 고정</div>
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-sm">김</div>
+              <div>
+                <div class="font-medium text-sm">김영어 원장</div>
+                <div class="text-xs text-gray-400">1주 전</div>
+              </div>
+            </div>
+            <p class="text-sm">우리 학원 커뮤니티에 오신 것을 환영합니다! 🎉</p>
+            <div class="flex gap-4 mt-3 text-sm text-gray-500">
+              <button onclick="likePost('1')">❤️ 5</button>
+              <span>💬 3</span>
+            </div>
+          </div>
+          
+          <div class="bg-white rounded-2xl p-4 shadow-sm">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-sm">학</div>
+              <div>
+                <div class="font-medium text-sm">학부모님</div>
+                <div class="text-xs text-gray-400">2시간 전</div>
+              </div>
+            </div>
+            <p class="text-sm">오늘 아이가 학원 다녀와서 영어로 인사하네요 ㅎㅎ</p>
+            <div class="flex gap-4 mt-3 text-sm text-gray-500">
+              <button onclick="likePost('2')">❤️ 8</button>
+              <span>💬 2</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 일정 -->
+        <div class="mt-4 bg-cyan-50 rounded-2xl p-4">
+          <h3 class="font-bold text-cyan-700 mb-3">📅 다가오는 일정</h3>
+          <div class="space-y-2">
+            <div class="bg-white rounded-xl p-3 flex items-center gap-3">
+              <div class="text-center">
+                <div class="text-xs text-cyan-600">2월</div>
+                <div class="text-xl font-bold">1</div>
+              </div>
+              <div>
+                <div class="font-medium text-sm">토익 특강</div>
+                <div class="text-xs text-gray-400">14:00</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -366,6 +448,15 @@ function logout() {
   page = 'login';
   tab = 'home';
   render();
+}
+
+// 커뮤니티 함수
+function likePost(id) {
+  alert('좋아요!');
+}
+
+function vote(optionIndex) {
+  alert('투표 완료!');
 }
 
 init();
