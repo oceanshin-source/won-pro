@@ -203,13 +203,26 @@ async function doRegister(){
   if(!name||!owner||!email||!pw){alert('필수 항목을 입력하세요');return;}
   if(categories.length === 0){alert('학원 종류를 1개 이상 선택하세요');return;}
   
+  // 6자리 학원 코드 생성
+  const code = generateCode();
+  
   loading=true;render();
-  const {data:academyData,error:err1} = await db.from('academies').insert({name,owner,phone,address,categories}).select().single();
+  const {data:academyData,error:err1} = await db.from('academies').insert({name,owner,phone,address,categories,code}).select().single();
   if(err1){alert('학원 등록 실패: '+err1.message);loading=false;render();return;}
   const {error:err2} = await db.from('admins').insert({academy_id:academyData.id,email,password:pw});
   if(err2){alert('관리자 등록 실패: '+err2.message);loading=false;render();return;}
-  alert('가입 완료! 로그인하세요.');
+  alert(`가입 완료!\n\n학원 코드: ${code}\n학부모 접속: wonpro.pages.dev/p/${code}\n학생 접속: wonpro.pages.dev/s/${code}\n\n로그인하세요.`);
   loading=false;page='login';render();
+}
+
+// 6자리 코드 생성 (영문 대문자 + 숫자)
+function generateCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for(let i=0; i<6; i++){
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
 }
 
 async function doLogin(){
