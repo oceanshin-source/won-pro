@@ -1,0 +1,1856 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>원생관리 Pro</title>
+  
+  <!-- PWA 설정 -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="원생관리Pro">
+  <meta name="theme-color" content="#4f46e5">
+  
+  <!-- 앱 아이콘 -->
+  <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%234f46e5' width='100' height='100' rx='20'/><text x='50' y='65' text-anchor='middle' font-size='50'>📚</text></svg>">
+  <link rel="manifest" href="manifest.json">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    *{font-family:-apple-system,'Malgun Gothic',sans-serif;box-sizing:border-box}
+    .sidebar-item.active{background:rgba(99,102,241,.15);color:#4f46e5;border-right:3px solid #4f46e5}
+    [contenteditable]:focus{outline:2px solid #6366f1;outline-offset:2px}
+    @media print{body *{visibility:hidden}.print-area,.print-area *{visibility:visible}.print-area{position:absolute;left:0;top:0;width:100%}}
+    /* 웹앱 모드에서 스플래시 */
+    @media(display-mode:standalone){body{padding-top:env(safe-area-inset-top)}}
+  </style>
+</head>
+<body class="bg-gray-100">
+<div id="app"></div>
+<script>
+const SUPABASE_URL = 'https://sniabexwdgeepakkxxek.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuaWFiZXh3ZGdlZXBha2t4eGVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MDMxNzIsImV4cCI6MjA4NTA3OTE3Mn0.RsDQDyawjFk5voFLVouXDlTIXvhPrsziCD37ne-1jMU';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let page = 'login';
+let academy = null;
+let admin = null;
+let students = [];
+let notices = [];
+let consults = [];
+let todos = [];
+let homework = [];
+let photos = [];
+let reports = [];
+let makeups = [];
+let chats = [];
+let attendance = {};
+let tab = 'dashboard';
+let modal = '';
+let editingId = null;
+let selectedStudents = {};
+let attTab = 'today';
+let viewStudentId = null;
+let loading = false;
+let docStudentId = '';
+let currentDoc = null;
+let photoStudentId = '';
+let chatStudentId = '';
+let reportStudentId = '';
+
+// Business 변수
+let staff = [];
+let staffAttendance = [];
+let salaries = [];
+let branches = [];
+let editingStaffId = null;
+let staffFormData = {name:'',email:'',password:'',role:'staff',permissions:{}};
+
+let formData = {name:'',phone:'',pPhone:'',course:'',level:'',fee:200000,paid:false,schedule:{},memo:''};
+
+const dayList = ['일','월','화','수','목','금','토'];
+const today = dayList[new Date().getDay()];
+const yesterday = dayList[(new Date().getDay()+6)%7];
+const tomorrow = dayList[(new Date().getDay()+1)%7];
+const todayStr = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
+const todayISO = new Date().toISOString().split('T')[0];
+
+const docs = [
+  {id:1,cat:'증명서',name:'재원증명서',icon:'📜'},{id:2,cat:'증명서',name:'수료증',icon:'🎓'},{id:3,cat:'증명서',name:'출석확인서',icon:'✅'},
+  {id:4,cat:'증명서',name:'성적증명서',icon:'📊'},{id:5,cat:'증명서',name:'레벨확인서',icon:'📈'},
+  {id:6,cat:'안내문',name:'수강료안내',icon:'💰'},{id:7,cat:'안내문',name:'휴원안내',icon:'🏖️'},{id:8,cat:'안내문',name:'수업변경',icon:'📅'},
+  {id:9,cat:'안내문',name:'특강안내',icon:'⭐'},{id:10,cat:'안내문',name:'학원소개',icon:'🏫'},
+  {id:11,cat:'계약서',name:'수강계약서',icon:'📝'},{id:12,cat:'계약서',name:'환불동의서',icon:'💸'},{id:13,cat:'계약서',name:'개인정보동의서',icon:'🔒'},
+  {id:14,cat:'계약서',name:'초상권동의서',icon:'📷'},{id:15,cat:'계약서',name:'학원규칙동의서',icon:'📋'},
+  {id:16,cat:'영수증',name:'수강료영수증',icon:'🧾'},{id:17,cat:'영수증',name:'교재비영수증',icon:'📚'},{id:18,cat:'영수증',name:'환불영수증',icon:'💳'},
+  {id:19,cat:'학습관리',name:'학습플랜',icon:'🎯'},{id:20,cat:'학습관리',name:'상담일지',icon:'📞'},{id:21,cat:'학습관리',name:'레벨테스트',icon:'✏️'},
+  {id:22,cat:'학습관리',name:'성적표',icon:'📋'},{id:23,cat:'학습관리',name:'출결표',icon:'📆'}
+];
+
+function fmt(n){return n>=10000?(n/10000).toFixed(0)+'만':n.toLocaleString();}
+function getStudentsByDay(day){
+  return students.filter(s=>{
+    if(s.schedule && typeof s.schedule === 'object') return s.schedule[day];
+    return s.days && s.days.includes(day);
+  }).sort((a,b)=>{
+    const tA = a.schedule?.[day] || a.time || '';
+    const tB = b.schedule?.[day] || b.time || '';
+    return tA.localeCompare(tB);
+  });
+}
+function getStudentTime(s,day){
+  if(s.schedule && typeof s.schedule === 'object') return s.schedule[day] || '';
+  return s.time || '';
+}
+
+function render(){
+  const app = document.getElementById('app');
+  if(loading){app.innerHTML='<div class="min-h-screen flex items-center justify-center"><div class="text-center"><div class="text-4xl mb-4">⏳</div><p>로딩중...</p></div></div>';return;}
+  if(page==='login') app.innerHTML = renderLogin();
+  else if(page==='register') app.innerHTML = renderRegister();
+  else if(page==='main') app.innerHTML = renderMain();
+}
+
+function renderLogin(){
+  return `
+  <div class="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+      <div class="text-center mb-8">
+        <div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-4 text-4xl">📚</div>
+        <h1 class="text-3xl font-bold text-white">원생관리 Pro</h1>
+        <p class="text-indigo-200 mt-2">학원 관리의 새로운 시작</p>
+      </div>
+      <div class="bg-white rounded-2xl p-6 shadow-xl">
+        <h2 class="text-xl font-bold mb-4">로그인</h2>
+        <input type="email" id="loginEmail" placeholder="이메일" class="w-full px-4 py-3 border rounded-xl mb-3">
+        <input type="password" id="loginPw" placeholder="비밀번호" class="w-full px-4 py-3 border rounded-xl mb-4">
+        <button onclick="doLogin()" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700">로그인</button>
+        <p class="text-center mt-4 text-gray-500">계정이 없으신가요? <button onclick="page='register';render()" class="text-indigo-600 font-medium">회원가입</button></p>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderRegister(){
+  const categories = {
+    '어학': ['영어', '중국어', '일본어', '기타외국어'],
+    '음악': ['피아노', '바이올린/첼로', '기타/우쿨렐레', '드럼/타악기', '보컬/성악', '작곡/미디'],
+    '미술': ['미술(회화)', '만화/웹툰', '공예/도예', '서예/캘리'],
+    '체육/무술': ['태권도', '합기도/유도/검도', '수영', '발레/무용', '체조/줄넘기', '축구/농구', '헬스/PT', '필라테스/요가', '골프', '클라이밍'],
+    '입시/학습': ['국어/논술', '수학', '영어(입시)', '과학', '사회/역사', '종합입시', '보습/공부방'],
+    '코딩/컴퓨터': ['코딩', '컴퓨터활용', '자격증'],
+    '기타': ['요리/베이킹', '바둑/체스', '독서/토론', '기타']
+  };
+  
+  let catHtml = '';
+  Object.entries(categories).forEach(([group, items]) => {
+    catHtml += `<div class="mb-3">
+      <div class="text-sm font-medium text-gray-700 mb-2">${group}</div>
+      <div class="flex flex-wrap gap-2">
+        ${items.map(item => `
+          <label class="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full text-sm cursor-pointer hover:bg-indigo-100">
+            <input type="checkbox" name="category" value="${item}" class="w-4 h-4"> ${item}
+          </label>
+        `).join('')}
+      </div>
+    </div>`;
+  });
+  
+  return `
+  <div class="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 flex items-center justify-center p-4">
+    <div class="w-full max-w-lg">
+      <div class="text-center mb-8">
+        <div class="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-4 text-4xl">📚</div>
+        <h1 class="text-3xl font-bold text-white">원생관리 Pro</h1>
+      </div>
+      <div class="bg-white rounded-2xl p-6 shadow-xl max-h-[80vh] overflow-y-auto">
+        <h2 class="text-xl font-bold mb-4">회원가입</h2>
+        <input type="text" id="regAcademy" placeholder="학원명 *" class="w-full px-4 py-3 border rounded-xl mb-3">
+        <input type="text" id="regOwner" placeholder="원장님 성함 *" class="w-full px-4 py-3 border rounded-xl mb-3">
+        <input type="tel" id="regPhone" placeholder="연락처" class="w-full px-4 py-3 border rounded-xl mb-3">
+        <input type="text" id="regAddress" placeholder="주소" class="w-full px-4 py-3 border rounded-xl mb-3">
+        <input type="email" id="regEmail" placeholder="이메일 (로그인용) *" class="w-full px-4 py-3 border rounded-xl mb-3">
+        <input type="password" id="regPw" placeholder="비밀번호 *" class="w-full px-4 py-3 border rounded-xl mb-4">
+        
+        <div class="border-t pt-4 mb-4">
+          <h3 class="font-bold mb-3">📚 학원 종류 (복수 선택 가능) *</h3>
+          ${catHtml}
+        </div>
+        
+        <button onclick="doRegister()" class="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700">가입하기</button>
+        <p class="text-center mt-4 text-gray-500">이미 계정이 있으신가요? <button onclick="page='login';render()" class="text-indigo-600 font-medium">로그인</button></p>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function doRegister(){
+  const name = document.getElementById('regAcademy').value;
+  const owner = document.getElementById('regOwner').value;
+  const phone = document.getElementById('regPhone').value;
+  const address = document.getElementById('regAddress').value;
+  const email = document.getElementById('regEmail').value;
+  const pw = document.getElementById('regPw').value;
+  
+  // 카테고리 수집
+  const checked = document.querySelectorAll('input[name="category"]:checked');
+  const categories = Array.from(checked).map(c => c.value);
+  
+  if(!name||!owner||!email||!pw){alert('필수 항목을 입력하세요');return;}
+  if(categories.length === 0){alert('학원 종류를 1개 이상 선택하세요');return;}
+  
+  // 6자리 학원 코드 생성
+  const code = generateCode();
+  
+  loading=true;render();
+  const {data:academyData,error:err1} = await db.from('academies').insert({name,owner,phone,address,categories,code}).select().single();
+  if(err1){alert('학원 등록 실패: '+err1.message);loading=false;render();return;}
+  const {error:err2} = await db.from('admins').insert({academy_id:academyData.id,email,password:pw});
+  if(err2){alert('관리자 등록 실패: '+err2.message);loading=false;render();return;}
+  alert(`가입 완료!\n\n학원 코드: ${code}\n학부모 접속: wonpro.pages.dev/p/${code}\n학생 접속: wonpro.pages.dev/s/${code}\n\n로그인하세요.`);
+  loading=false;page='login';render();
+}
+
+// 6자리 코드 생성 (영문 대문자 + 숫자)
+function generateCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for(let i=0; i<6; i++){
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+async function doLogin(){
+  const email = document.getElementById('loginEmail').value;
+  const pw = document.getElementById('loginPw').value;
+  if(!email||!pw){alert('이메일과 비밀번호를 입력하세요');return;}
+  loading=true;render();
+  const {data,error} = await db.from('admins').select('*,academies(*)').eq('email',email).eq('password',pw).single();
+  if(error||!data){alert('로그인 실패');loading=false;render();return;}
+  admin = data;
+  academy = data.academies;
+  await loadData();
+  loading=false;page='main';render();
+}
+
+async function loadData(){
+  const {data:s} = await db.from('students').select('*').eq('academy_id',academy.id);
+  students = s || [];
+  const {data:n} = await db.from('notices').select('*').eq('academy_id',academy.id).order('created_at',{ascending:false});
+  notices = n || [];
+  const {data:t} = await db.from('todos').select('*').eq('academy_id',academy.id);
+  todos = t || [];
+  const {data:c} = await db.from('consults').select('*').order('created_at',{ascending:false});
+  consults = (c || []).filter(x => students.some(st => st.id === x.student_id));
+  const {data:hw} = await db.from('homework').select('*').order('created_at',{ascending:false});
+  homework = (hw || []).filter(x => students.some(st => st.id === x.student_id));
+  const {data:p} = await db.from('photos').select('*').eq('academy_id',academy.id).order('created_at',{ascending:false});
+  photos = p || [];
+  const {data:r} = await db.from('reports').select('*').order('created_at',{ascending:false});
+  reports = (r || []).filter(x => students.some(st => st.id === x.student_id));
+  const {data:m} = await db.from('makeups').select('*').order('created_at',{ascending:false});
+  makeups = (m || []).filter(x => students.some(st => st.id === x.student_id));
+  const {data:ch} = await db.from('chats').select('*').eq('academy_id',academy.id).order('created_at',{ascending:true});
+  chats = ch || [];
+  // Business 데이터
+  const {data:st} = await db.from('staff').select('*').eq('academy_id',academy.id);
+  staff = st || [];
+  const {data:sa} = await db.from('staff_attendance').select('*').eq('date',todayISO);
+  staffAttendance = (sa || []).filter(x => staff.some(stf => stf.id === x.staff_id));
+  const currentMonth = new Date().toISOString().slice(0,7);
+  const {data:sal} = await db.from('salaries').select('*').eq('month',currentMonth);
+  salaries = (sal || []).filter(x => staff.some(stf => stf.id === x.staff_id));
+  const {data:br} = await db.from('academies').select('*').eq('parent_id',academy.id);
+  branches = br || [];
+  const {data:a} = await db.from('attendance').select('*').eq('date',todayISO);
+  attendance = {};
+  (a||[]).forEach(att=>{attendance[att.student_id]=att.status;});
+}
+
+function logout(){
+  admin=null;academy=null;students=[];notices=[];todos=[];consults=[];homework=[];attendance={};
+  page='login';render();
+}
+
+function renderMain(){
+  const todayS = getStudentsByDay(today);
+  const tomorrowS = getStudentsByDay(tomorrow);
+  const unpaid = students.filter(s=>!s.paid);
+  const revenue = students.filter(s=>s.paid).reduce((a,s)=>a+(s.fee||0),0);
+  const pendingConsults = consults.filter(c=>c.status==='대기');
+  const pendingMakeups = makeups.filter(m=>m.status==='대기');
+
+  const menus = [
+    {id:'dashboard',icon:'📊',label:'대시보드'},
+    {id:'students',icon:'👥',label:'원생관리'},
+    {id:'attendance',icon:'📅',label:'출결관리'},
+    {id:'payments',icon:'💰',label:'수강료'},
+    {id:'photos',icon:'📸',label:'수업사진',pro:true},
+    {id:'reports',icon:'📈',label:'학습리포트',pro:true},
+    {id:'makeups',icon:'🔄',label:'보강신청',pro:true,badge:pendingMakeups.length},
+    {id:'chat',icon:'💬',label:'채팅',pro:true},
+    {id:'points',icon:'🏆',label:'출석포인트',pro:true},
+    {id:'notices',icon:'📢',label:'공지사항'},
+    {id:'consult',icon:'🗣️',label:'상담',badge:pendingConsults.length},
+    {id:'homework',icon:'📝',label:'과제관리'},
+    {id:'documents',icon:'📄',label:'문서템플릿'},
+    {id:'staff',icon:'👔',label:'직원관리',biz:true},
+    {id:'staffAtt',icon:'⏰',label:'직원근태',biz:true},
+    {id:'salary',icon:'💵',label:'급여관리',biz:true},
+    {id:'branches',icon:'🏢',label:'다지점',biz:true},
+    {id:'settings',icon:'⚙️',label:'설정'}
+  ];
+
+  let h = '<div class="flex min-h-screen">';
+  
+  // 사이드바
+  h += `<aside class="hidden lg:flex w-64 bg-white border-r flex-col fixed h-full">
+    <div class="p-4 border-b"><div class="flex items-center gap-3"><span class="text-2xl">📚</span><div><div class="font-bold">${academy.name}</div><div class="text-xs text-gray-400">${academy.owner}</div></div></div></div>
+    <nav class="flex-1 py-2 overflow-y-auto">`;
+  menus.forEach(m=>{
+    const cls = tab===m.id ? 'active bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50';
+    const badge = m.badge ? `<span class="ml-auto bg-red-500 text-white text-xs px-2 rounded-full">${m.badge}</span>` : '';
+    h += `<button onclick="tab='${m.id}';viewStudentId=null;render()" class="sidebar-item w-full px-4 py-3 flex items-center gap-3 text-left ${cls}">${m.icon} ${m.label}${badge}</button>`;
+  });
+  h += `</nav><div class="p-4 border-t"><button onclick="logout()" class="text-gray-500 text-sm">로그아웃</button></div></aside>`;
+
+  h += '<main class="flex-1 lg:ml-64">';
+  
+  // 헤더
+  h += `<header class="bg-white border-b sticky top-0 z-10">
+    <div class="px-4 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-2 lg:hidden"><span>📚</span><span class="font-bold">${academy.name}</span></div>
+      <div class="hidden lg:block font-bold">${viewStudentId ? '원생 상세' : menus.find(m=>m.id===tab)?.label||''}</div>
+      <div class="flex gap-2">
+        <button onclick="openAddStudent()" class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg">+원생</button>
+        <button onclick="logout()" class="lg:hidden text-gray-500 text-sm">로그아웃</button>
+      </div>
+    </div>
+    <div class="lg:hidden flex border-t overflow-x-auto">`;
+  menus.slice(0,6).forEach(m=>{
+    h += `<button onclick="tab='${m.id}';render()" class="px-4 py-2 text-sm whitespace-nowrap border-b-2 ${tab===m.id?'border-indigo-600 text-indigo-600':'border-transparent text-gray-500'}">${m.icon}</button>`;
+  });
+  h += '</div></header>';
+
+  h += '<div class="p-4 lg:p-6">';
+
+  // 원생 상세
+  if(viewStudentId){
+    h += renderStudentDetail();
+  }
+  // 대시보드
+  else if(tab==='dashboard'){
+    h += `<div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-6 text-white mb-6">
+      <p class="text-indigo-100">${todayStr} ${today}요일</p>
+      <h2 class="text-2xl font-bold mt-1">안녕하세요, ${academy.owner} 원장님!</h2>
+    </div>`;
+
+    h += `<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white rounded-2xl p-5 border"><p class="text-gray-500 text-sm">전체원생</p><p class="text-3xl font-bold">${students.length}<span class="text-lg text-gray-400">명</span></p></div>
+      <div class="bg-white rounded-2xl p-5 border"><p class="text-gray-500 text-sm">이번달 매출</p><p class="text-3xl font-bold text-emerald-600">${fmt(revenue)}</p></div>
+      <div class="bg-white rounded-2xl p-5 border"><p class="text-gray-500 text-sm">오늘수업</p><p class="text-3xl font-bold text-blue-600">${todayS.length}<span class="text-lg text-gray-400">명</span></p></div>
+      <div class="bg-white rounded-2xl p-5 border cursor-pointer" onclick="tab='payments';render()"><p class="text-gray-500 text-sm">미납</p><p class="text-3xl font-bold text-red-600">${unpaid.length}<span class="text-lg text-gray-400">명</span></p></div>
+    </div>`;
+
+    h += '<div class="grid lg:grid-cols-3 gap-6">';
+    h += '<div class="lg:col-span-2 space-y-4">';
+    
+    // 오늘 수업
+    h += `<div class="bg-white rounded-2xl border p-5">
+      <div class="flex justify-between items-center mb-4"><h3 class="font-bold">📅 오늘 수업 (${today})</h3><span class="text-indigo-600 font-bold">${todayS.length}명</span></div>`;
+    if(todayS.length){
+      h += '<div class="space-y-2">';
+      todayS.forEach(s=>{
+        const time = getStudentTime(s, today);
+        const checked = attendance[s.id];
+        h += `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+          <div class="flex items-center gap-3"><span class="text-lg font-bold text-indigo-600">${time||'-'}</span><div><div class="font-medium">${s.name}</div><div class="text-xs text-gray-500">${s.course||''}</div></div></div>
+          <span class="text-sm ${checked?'text-emerald-600':'text-gray-400'}">${checked?'✓출석':'대기'}</span>
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<p class="text-gray-400 text-center py-4">오늘 수업 없음</p>';
+    }
+    h += `<button onclick="tab='attendance';render()" class="w-full mt-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm">출석체크 →</button></div>`;
+
+    // 내일
+    h += `<div class="bg-white rounded-2xl border p-5">
+      <div class="flex justify-between items-center mb-4"><h3 class="font-bold">📆 내일 수업 (${tomorrow})</h3><span class="text-purple-600 font-bold">${tomorrowS.length}명</span></div>`;
+    if(tomorrowS.length){
+      h += '<div class="space-y-2">';
+      tomorrowS.slice(0,4).forEach(s=>{
+        const time = getStudentTime(s, tomorrow);
+        h += `<div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+          <div class="flex items-center gap-3"><span class="text-lg font-bold text-purple-600">${time||'-'}</span><div><div class="font-medium">${s.name}</div><div class="text-xs text-gray-500">${s.course||''}</div></div></div>
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<p class="text-gray-400 text-center py-4">내일 수업 없음</p>';
+    }
+    h += '</div></div>';
+
+    // 사이드
+    h += '<div class="space-y-4">';
+    // 할일
+    h += `<div class="bg-white rounded-2xl border p-5">
+      <div class="flex justify-between items-center mb-3"><h3 class="font-bold">📋 오늘 할 일</h3><button onclick="addTodo()" class="text-indigo-600 text-sm">+추가</button></div>
+      <div class="space-y-2 text-sm">`;
+    todos.forEach(t=>{
+      h += `<div class="flex items-center gap-2 p-2 rounded-lg ${t.urgent&&!t.done?'bg-red-50':'bg-gray-50'}">
+        <input type="checkbox" ${t.done?'checked':''} onchange="toggleTodo('${t.id}')" class="w-4 h-4">
+        <span class="flex-1 ${t.done?'line-through text-gray-400':''}">${t.text}</span>
+        <button onclick="deleteTodo('${t.id}')" class="text-gray-400 hover:text-red-500">✕</button>
+      </div>`;
+    });
+    if(!todos.length) h += '<p class="text-gray-400 text-center py-2">할 일 없음</p>';
+    h += '</div></div>';
+
+    // 상담대기
+    h += `<div class="bg-white rounded-2xl border p-5">
+      <div class="flex justify-between items-center mb-3"><h3 class="font-bold">💬 상담 대기</h3>${pendingConsults.length?`<span class="bg-red-500 text-white text-xs px-2 py-1 rounded-full">${pendingConsults.length}</span>`:''}</div>`;
+    if(pendingConsults.length){
+      pendingConsults.slice(0,2).forEach(c=>{
+        const stu = students.find(s=>s.id===c.student_id);
+        h += `<div class="p-3 bg-red-50 rounded-xl mb-2"><div class="font-medium text-sm">${stu?.name||''}</div><p class="text-xs text-gray-600 truncate">${c.message||''}</p></div>`;
+      });
+      h += `<button onclick="tab='consult';render()" class="w-full py-2 text-indigo-600 text-sm">답변하기 →</button>`;
+    } else {
+      h += '<p class="text-gray-400 text-center py-4 text-sm">대기중 상담 없음 ✨</p>';
+    }
+    h += '</div>';
+
+    // 미납
+    h += `<div class="bg-white rounded-2xl border p-5">
+      <div class="flex justify-between items-center mb-3"><h3 class="font-bold">💸 미납</h3><span class="text-red-600 font-medium">${fmt(unpaid.reduce((a,s)=>a+(s.fee||0),0))}</span></div>`;
+    unpaid.slice(0,3).forEach(s=>{
+      h += `<div class="flex justify-between py-2 border-b last:border-0"><span>${s.name}</span><span class="text-red-600">${fmt(s.fee||0)}</span></div>`;
+    });
+    if(!unpaid.length) h += '<p class="text-gray-400 text-center py-2">미납 없음 🎉</p>';
+    h += '</div></div></div>';
+  }
+
+  // 원생관리
+  else if(tab==='students'){
+    h += `<div class="flex justify-between items-center mb-4">
+      <input type="text" placeholder="검색..." class="px-4 py-2 border rounded-xl w-64">
+      <button onclick="downloadExcel()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm">📥 엑셀</button>
+    </div>`;
+    h += '<div class="bg-white rounded-2xl border overflow-hidden">';
+    h += `<table class="w-full"><thead><tr class="bg-gray-50 border-b">
+      <th class="text-left px-4 py-3 text-sm">원생</th>
+      <th class="text-left px-4 py-3 text-sm">과목</th>
+      <th class="text-left px-4 py-3 text-sm hidden md:table-cell">수업일정</th>
+      <th class="text-right px-4 py-3 text-sm">수강료</th>
+    </tr></thead><tbody>`;
+    students.forEach(s=>{
+      const scheduleStr = s.schedule ? Object.entries(s.schedule).map(([d,t])=>`${d} ${t}`).join(', ') : (s.days||[]).join(' ')+' '+(s.time||'');
+      h += `<tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="viewStudentId='${s.id}';render()">
+        <td class="px-4 py-3"><div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">${s.name?.[0]||'?'}</div>
+          <div><div class="font-medium">${s.name}</div><div class="text-xs text-gray-500">${s.phone||''}</div></div>
+        </div></td>
+        <td class="px-4 py-3"><span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-sm">${s.course||'-'}</span></td>
+        <td class="px-4 py-3 text-sm hidden md:table-cell">${scheduleStr}</td>
+        <td class="px-4 py-3 text-right"><div class="font-medium">${fmt(s.fee||0)}</div><div class="text-xs ${s.paid?'text-emerald-600':'text-red-500'}">${s.paid?'완료':'미납'}</div></td>
+      </tr>`;
+    });
+    if(!students.length) h += '<tr><td colspan="4" class="text-center py-8 text-gray-400">원생을 등록하세요</td></tr>';
+    h += '</tbody></table></div>';
+  }
+
+  // 출결관리
+  else if(tab==='attendance'){
+    const list = attTab==='yesterday'?getStudentsByDay(yesterday):attTab==='tomorrow'?getStudentsByDay(tomorrow):getStudentsByDay(today);
+    const dayLabel = attTab==='yesterday'?yesterday:attTab==='tomorrow'?tomorrow:today;
+    const selCount = Object.keys(selectedStudents).filter(k=>selectedStudents[k]).length;
+
+    h += `<div class="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-6 text-white mb-6">
+      <div class="flex justify-between items-center"><div><h3 class="text-xl font-bold">📱 출결 관리</h3></div>
+      <div class="text-right"><div class="text-3xl font-bold">${Object.keys(attendance).filter(k=>attendance[k]).length}/${getStudentsByDay(today).length}</div><div class="text-emerald-100">오늘 출석</div></div></div></div>`;
+
+    h += `<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+      <div class="flex gap-2">
+        <button onclick="attTab='yesterday';render()" class="px-4 py-2 rounded-xl ${attTab==='yesterday'?'bg-indigo-600 text-white':'bg-white border'}">어제 (${yesterday})</button>
+        <button onclick="attTab='today';render()" class="px-4 py-2 rounded-xl ${attTab==='today'?'bg-indigo-600 text-white':'bg-white border'}">오늘 (${today})</button>
+        <button onclick="attTab='tomorrow';render()" class="px-4 py-2 rounded-xl ${attTab==='tomorrow'?'bg-indigo-600 text-white':'bg-white border'}">내일 (${tomorrow})</button>
+      </div>
+      <button onclick="openSmsModal()" class="px-4 py-2 bg-blue-600 text-white rounded-xl ${selCount===0?'opacity-50':''}">📱 문자보내기 (${selCount})</button>
+    </div>`;
+
+    h += '<div class="bg-white rounded-2xl border p-4">';
+    if(list.length){
+      h += '<div class="space-y-2">';
+      list.forEach(s=>{
+        const time = getStudentTime(s, dayLabel);
+        const checked = attTab==='today' && attendance[s.id];
+        const selected = selectedStudents[s.id];
+        h += `<div class="flex items-center gap-3 p-4 rounded-xl border-2 ${checked?'border-emerald-500 bg-emerald-50':'border-gray-200'}">
+          <input type="checkbox" ${selected?'checked':''} onchange="toggleSelect('${s.id}')" class="w-5 h-5" title="문자 선택">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center font-bold ${checked?'bg-emerald-500 text-white':'bg-gray-100'}">
+            ${s.name?.[0]||'?'}
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="font-medium">${s.name}</span>
+              ${attTab==='today' ? `<button onclick="toggleAtt('${s.id}')" class="px-3 py-1 text-xs rounded-lg ${checked?'bg-emerald-100 text-emerald-700':'bg-gray-200 text-gray-600'}">${checked?'✓ 출석완료':'출석'}</button>` : ''}
+            </div>
+            <div class="text-sm text-gray-500">${s.course||''} · ${time}</div>
+          </div>
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<p class="text-center text-gray-400 py-8">수업 없음</p>';
+    }
+    h += '</div>';
+  }
+
+  // 수강료
+  else if(tab==='payments'){
+    const total = students.reduce((a,s)=>a+(s.fee||0),0);
+    const paidAmt = students.filter(s=>s.paid).reduce((a,s)=>a+(s.fee||0),0);
+    const unpaidList = students.filter(s=>!s.paid);
+
+    h += `<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white rounded-2xl p-5 border"><div class="text-sm text-gray-500">예상매출</div><div class="text-2xl font-bold">${fmt(total)}</div></div>
+      <div class="bg-white rounded-2xl p-5 border"><div class="text-sm text-gray-500">수납완료</div><div class="text-2xl font-bold text-emerald-600">${fmt(paidAmt)}</div></div>
+      <div class="bg-white rounded-2xl p-5 border"><div class="text-sm text-gray-500">미수금</div><div class="text-2xl font-bold text-red-600">${fmt(total-paidAmt)}</div></div>
+      <div class="bg-white rounded-2xl p-5 border"><div class="text-sm text-gray-500">수납률</div><div class="text-2xl font-bold text-indigo-600">${total?Math.round(paidAmt/total*100):0}%</div></div>
+    </div>`;
+
+    h += '<div class="bg-white rounded-2xl border">';
+    h += `<div class="px-4 py-3 border-b flex justify-between"><span class="font-bold">미납 원생</span><span class="text-red-600">${unpaidList.length}명</span></div>`;
+    unpaidList.forEach(s=>{
+      h += `<div class="flex items-center justify-between px-4 py-3 border-b">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-red-100 text-red-600 rounded-full flex items-center justify-center">${s.name?.[0]||'?'}</div>
+          <div><div class="font-medium">${s.name}</div><div class="text-xs text-gray-500">${s.course||''}</div></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="font-bold">${fmt(s.fee||0)}</span>
+          <button onclick="markPaid('${s.id}')" class="px-3 py-1 bg-emerald-600 text-white text-sm rounded-lg">수납</button>
+        </div>
+      </div>`;
+    });
+    if(!unpaidList.length) h += '<p class="text-center text-gray-400 py-8">🎉 미납 없음</p>';
+    h += '</div>';
+  }
+
+  // 공지사항
+  else if(tab==='notices'){
+    h += `<div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">📢 공지사항</h2><button onclick="addNotice()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm">+ 새 공지</button></div>`;
+    notices.forEach(n=>{
+      h += `<div class="bg-white rounded-2xl border p-5 mb-3">
+        <div class="flex justify-between"><h3 class="font-bold">${n.title}</h3><button onclick="deleteNotice('${n.id}')" class="text-gray-400">✕</button></div>
+        <p class="text-sm text-gray-500 mt-1">${new Date(n.created_at).toLocaleDateString('ko-KR')}</p>
+        <p class="mt-2">${n.content||''}</p>
+      </div>`;
+    });
+    if(!notices.length) h += '<p class="text-gray-400 text-center py-8">공지사항 없음</p>';
+  }
+
+  // 상담
+  else if(tab==='consult'){
+    h += '<h2 class="text-xl font-bold mb-4">💬 상담 관리</h2>';
+    if(consults.length){
+      consults.forEach(c=>{
+        const stu = students.find(s=>s.id===c.student_id);
+        h += `<div class="bg-white rounded-2xl border p-5 mb-3 ${c.status==='대기'?'border-l-4 border-l-red-500':''}">
+          <div class="flex justify-between mb-2"><span class="font-medium">${stu?.name||'알수없음'}</span><span class="text-xs px-2 py-1 rounded-full ${c.status==='대기'?'bg-red-100 text-red-600':'bg-emerald-100 text-emerald-600'}">${c.status}</span></div>
+          <div class="p-3 bg-gray-50 rounded-xl mb-3">${c.message||''}</div>
+          ${c.reply?`<div class="p-3 bg-indigo-50 rounded-xl"><span class="text-xs text-indigo-600">답변</span><p class="mt-1">${c.reply}</p></div>`:`<textarea id="reply${c.id}" class="w-full p-3 border rounded-xl mb-2" placeholder="답변 입력"></textarea><button onclick="sendReply('${c.id}')" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm">답변</button>`}
+        </div>`;
+      });
+    } else {
+      h += '<p class="text-gray-400 text-center py-8">상담 내역 없음</p>';
+    }
+  }
+
+  // 과제관리
+  else if(tab==='homework'){
+    h += '<h2 class="text-xl font-bold mb-4">📝 과제 관리</h2>';
+    h += '<div class="grid md:grid-cols-2 gap-4">';
+    students.forEach(s=>{
+      const sHw = homework.filter(hw=>hw.student_id===s.id);
+      h += `<div class="bg-white rounded-2xl border p-5">
+        <div class="flex justify-between items-center mb-3">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">${s.name?.[0]||'?'}</div>
+            <div><div class="font-medium">${s.name}</div><div class="text-xs text-gray-500">${s.course||''}</div></div>
+          </div>
+          <button onclick="addHomework('${s.id}')" class="text-indigo-600 text-sm">+과제</button>
+        </div>`;
+      if(sHw.length){
+        sHw.forEach(hw=>{
+          h += `<div class="p-2 bg-gray-50 rounded-lg text-sm flex items-center gap-2 mb-1">
+            <input type="checkbox" ${hw.done?'checked':''} onchange="toggleHomework('${hw.id}')" class="w-4 h-4">
+            <span class="${hw.done?'line-through text-gray-400':''}">${hw.title}</span>
+            <button onclick="deleteHomework('${hw.id}')" class="ml-auto text-gray-400 hover:text-red-500">✕</button>
+          </div>`;
+        });
+      } else {
+        h += '<p class="text-gray-400 text-sm text-center py-2">과제 없음</p>';
+      }
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+
+  // 문서템플릿
+  else if(tab==='documents'){
+    const cats = [...new Set(docs.map(d=>d.cat))];
+    h += `<div class="bg-gradient-to-r from-violet-500 to-purple-600 rounded-2xl p-6 text-white mb-6">
+      <h3 class="text-xl font-bold">📄 문서 템플릿 (23종)</h3>
+      <p class="text-violet-100">원생 정보 자동 입력 + 직접 편집 가능</p>
+    </div>`;
+    h += '<div class="bg-white rounded-2xl border p-5">';
+    h += `<div class="mb-4"><label class="text-sm font-medium">원생 선택</label>
+      <select id="docStudent" onchange="docStudentId=this.value" class="ml-2 px-3 py-2 border rounded-xl">
+        <option value="">선택안함</option>`;
+    students.forEach(s=>{h+=`<option value="${s.id}">${s.name}</option>`;});
+    h += '</select></div>';
+    cats.forEach(cat=>{
+      h += `<div class="mb-4"><h4 class="text-sm font-bold text-gray-500 mb-2">${cat}</h4><div class="grid grid-cols-3 sm:grid-cols-5 gap-2">`;
+      docs.filter(d=>d.cat===cat).forEach(d=>{
+        h += `<button onclick="openDoc(${d.id})" class="p-3 bg-gray-50 rounded-xl hover:bg-indigo-50 text-center"><span class="text-2xl">${d.icon}</span><div class="text-xs mt-1">${d.name}</div></button>`;
+      });
+      h += '</div></div>';
+    });
+    h += '</div>';
+  }
+
+  // 수업사진 (Pro)
+  else if(tab==='photos'){
+    const thisMonth = photos.filter(p => {
+      const d = new Date(p.created_at);
+      const now = new Date();
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+    
+    h += `<div class="bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl p-6 text-white mb-6">
+      <div class="flex justify-between items-center">
+        <div><h3 class="text-xl font-bold">📸 수업 사진</h3><p class="text-pink-100">학부모에게 수업 모습을 공유하세요</p></div>
+        <div class="text-right"><div class="text-3xl font-bold">${thisMonth.length}/50</div><div class="text-pink-100">이번달 업로드</div></div>
+      </div>
+    </div>`;
+    
+    h += `<div class="bg-white rounded-2xl border p-5 mb-4">
+      <div class="flex flex-wrap gap-3 items-center mb-4">
+        <select id="photoStudent" onchange="photoStudentId=this.value" class="px-4 py-2 border rounded-xl">
+          <option value="">원생 선택</option>`;
+    students.forEach(s => { h += `<option value="${s.id}">${s.name}</option>`; });
+    h += `</select>
+        <label class="flex-1 min-w-[200px]">
+          <div class="px-4 py-3 bg-indigo-600 text-white rounded-xl text-center cursor-pointer hover:bg-indigo-700">
+            📷 사진 업로드
+          </div>
+          <input type="file" accept="image/*" onchange="uploadPhoto(this)" class="hidden">
+        </label>
+      </div>
+      <p class="text-sm text-gray-500">💡 사진은 자동으로 1200px로 리사이즈되며, 월 50장까지 업로드 가능합니다.</p>
+    </div>`;
+    
+    // 사진 갤러리
+    if(photos.length){
+      h += '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">';
+      photos.forEach(p => {
+        const stu = students.find(s => s.id === p.student_id);
+        const date = new Date(p.created_at).toLocaleDateString('ko-KR');
+        h += `<div class="bg-white rounded-xl border overflow-hidden group relative">
+          <img src="${p.url}" class="w-full h-40 object-cover">
+          <div class="p-3">
+            <div class="font-medium text-sm">${stu?.name || '전체'}</div>
+            <div class="text-xs text-gray-500">${date}</div>
+            ${p.caption ? `<div class="text-xs text-gray-600 mt-1">${p.caption}</div>` : ''}
+          </div>
+          <button onclick="deletePhoto('${p.id}')" class="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<div class="text-center py-12 text-gray-400"><div class="text-4xl mb-3">📷</div><p>아직 업로드된 사진이 없습니다</p></div>';
+    }
+  }
+
+  // 학습 리포트 (Pro)
+  else if(tab==='reports'){
+    const currentMonth = new Date().toISOString().slice(0,7);
+    
+    h += `<div class="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-6 text-white mb-6">
+      <h3 class="text-xl font-bold">📈 학습 리포트</h3>
+      <p class="text-blue-100">월별 학습 현황을 학부모에게 전달하세요</p>
+    </div>`;
+    
+    h += '<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">';
+    students.forEach(s => {
+      const sReports = reports.filter(r => r.student_id === s.id);
+      const hasThisMonth = sReports.some(r => r.month === currentMonth);
+      const attCount = Object.keys(attendance).filter(k => attendance[k] && k === s.id).length;
+      
+      h += `<div class="bg-white rounded-2xl border p-5">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-xl font-bold">${s.name?.[0]||'?'}</div>
+          <div><div class="font-bold">${s.name}</div><div class="text-sm text-gray-500">${s.course||''}</div></div>
+        </div>
+        <div class="flex items-center justify-between text-sm mb-3">
+          <span>출석 포인트</span><span class="font-bold text-blue-600">${s.points||0}점</span>
+        </div>
+        <div class="flex gap-2">
+          ${hasThisMonth 
+            ? `<span class="flex-1 py-2 bg-emerald-100 text-emerald-700 rounded-xl text-center text-sm">✓ 이번달 작성완료</span>`
+            : `<button onclick="openReportModal('${s.id}')" class="flex-1 py-2 bg-blue-600 text-white rounded-xl text-sm">리포트 작성</button>`
+          }
+        </div>
+      </div>`;
+    });
+    h += '</div>';
+  }
+
+  // 보강 신청 (Pro)
+  else if(tab==='makeups'){
+    h += `<div class="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-6 text-white mb-6">
+      <div class="flex justify-between items-center">
+        <div><h3 class="text-xl font-bold">🔄 보강 신청</h3><p class="text-amber-100">학부모가 신청한 보강을 관리하세요</p></div>
+        <div class="text-right"><div class="text-3xl font-bold">${pendingMakeups.length}</div><div class="text-amber-100">대기중</div></div>
+      </div>
+    </div>`;
+    
+    if(makeups.length){
+      h += '<div class="space-y-3">';
+      makeups.forEach(m => {
+        const stu = students.find(s => s.id === m.student_id);
+        const statusColor = m.status === '대기' ? 'bg-amber-100 text-amber-700' : m.status === '승인' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700';
+        h += `<div class="bg-white rounded-2xl border p-5 ${m.status==='대기'?'border-l-4 border-l-amber-500':''}">
+          <div class="flex justify-between items-start mb-3">
+            <div>
+              <div class="font-bold">${stu?.name||'알수없음'}</div>
+              <div class="text-sm text-gray-500">${m.original_date} 수업 → ${m.request_date||'미정'}</div>
+            </div>
+            <span class="px-3 py-1 rounded-full text-sm ${statusColor}">${m.status}</span>
+          </div>
+          ${m.reason ? `<p class="text-sm text-gray-600 mb-3">사유: ${m.reason}</p>` : ''}
+          ${m.status === '대기' ? `
+            <div class="flex gap-2">
+              <button onclick="handleMakeup('${m.id}','승인')" class="flex-1 py-2 bg-emerald-600 text-white rounded-xl text-sm">승인</button>
+              <button onclick="handleMakeup('${m.id}','거절')" class="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm">거절</button>
+            </div>
+          ` : ''}
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<div class="text-center py-12 text-gray-400"><div class="text-4xl mb-3">🔄</div><p>보강 신청 내역이 없습니다</p></div>';
+    }
+  }
+
+  // 채팅 (Pro)
+  else if(tab==='chat'){
+    h += `<div class="bg-gradient-to-r from-violet-500 to-purple-500 rounded-2xl p-6 text-white mb-6">
+      <h3 class="text-xl font-bold">💬 실시간 채팅</h3>
+      <p class="text-violet-100">학부모와 실시간으로 소통하세요</p>
+    </div>`;
+    
+    h += `<div class="flex gap-4" style="height: calc(100vh - 350px);">
+      <div class="w-64 bg-white rounded-2xl border overflow-hidden flex flex-col">
+        <div class="p-3 border-b font-bold text-sm">원생 선택</div>
+        <div class="flex-1 overflow-y-auto">`;
+    students.forEach(s => {
+      const unread = chats.filter(c => c.student_id === s.id && c.sender === 'parent').length;
+      h += `<button onclick="chatStudentId='${s.id}';render()" class="w-full p-3 text-left hover:bg-gray-50 border-b flex items-center gap-2 ${chatStudentId===s.id?'bg-indigo-50':''}">
+        <div class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-sm font-bold">${s.name?.[0]||'?'}</div>
+        <div class="flex-1"><div class="font-medium text-sm">${s.name}</div></div>
+        ${unread ? `<span class="w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">${unread}</span>` : ''}
+      </button>`;
+    });
+    h += `</div></div>
+      <div class="flex-1 bg-white rounded-2xl border flex flex-col overflow-hidden">`;
+    
+    if(chatStudentId){
+      const stu = students.find(s => s.id === chatStudentId);
+      const studentChats = chats.filter(c => c.student_id === chatStudentId);
+      h += `<div class="p-4 border-b font-bold">${stu?.name||''} 채팅</div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-3" id="chatMessages">`;
+      studentChats.forEach(c => {
+        const isMe = c.sender === 'admin';
+        h += `<div class="flex ${isMe?'justify-end':'justify-start'}">
+          <div class="max-w-[70%] p-3 rounded-2xl ${isMe?'bg-indigo-600 text-white':'bg-gray-100'}">${c.message}</div>
+        </div>`;
+      });
+      h += `</div>
+        <div class="p-4 border-t flex gap-2">
+          <input type="text" id="chatInput" placeholder="메시지 입력..." class="flex-1 px-4 py-2 border rounded-xl" onkeypress="if(event.key==='Enter')sendChat()">
+          <button onclick="sendChat()" class="px-6 py-2 bg-indigo-600 text-white rounded-xl">전송</button>
+        </div>`;
+    } else {
+      h += '<div class="flex-1 flex items-center justify-center text-gray-400">원생을 선택하세요</div>';
+    }
+    h += '</div></div>';
+  }
+
+  // 출석 포인트 (Pro)
+  else if(tab==='points'){
+    const sortedStudents = [...students].sort((a,b) => (b.points||0) - (a.points||0));
+    
+    h += `<div class="bg-gradient-to-r from-yellow-500 to-amber-500 rounded-2xl p-6 text-white mb-6">
+      <h3 class="text-xl font-bold">🏆 출석 포인트 & 랭킹</h3>
+      <p class="text-yellow-100">출석할 때마다 포인트 적립! 학생들의 동기 부여</p>
+    </div>`;
+    
+    h += `<div class="bg-white rounded-2xl border p-5 mb-4">
+      <h4 class="font-bold mb-3">포인트 설정</h4>
+      <div class="flex gap-4 text-sm">
+        <div class="flex items-center gap-2"><span>출석:</span><span class="font-bold text-indigo-600">+10점</span></div>
+        <div class="flex items-center gap-2"><span>지각:</span><span class="font-bold text-amber-600">+5점</span></div>
+        <div class="flex items-center gap-2"><span>결석:</span><span class="font-bold text-red-600">0점</span></div>
+      </div>
+    </div>`;
+    
+    h += '<div class="bg-white rounded-2xl border overflow-hidden">';
+    h += '<div class="p-4 border-b font-bold">🏆 랭킹</div>';
+    sortedStudents.forEach((s, i) => {
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}`;
+      const bgColor = i < 3 ? 'bg-amber-50' : '';
+      h += `<div class="flex items-center gap-4 p-4 border-b ${bgColor}">
+        <div class="w-8 text-center font-bold ${i<3?'text-2xl':''}">${medal}</div>
+        <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">${s.name?.[0]||'?'}</div>
+        <div class="flex-1"><div class="font-medium">${s.name}</div><div class="text-sm text-gray-500">${s.course||''}</div></div>
+        <div class="text-right">
+          <div class="text-xl font-bold text-indigo-600">${s.points||0}</div>
+          <div class="text-xs text-gray-500">포인트</div>
+        </div>
+        <button onclick="adjustPoints('${s.id}')" class="px-3 py-1 border rounded-lg text-sm">조정</button>
+      </div>`;
+    });
+    h += '</div>';
+  }
+
+  // 직원 관리 (Business)
+  else if(tab==='staff'){
+    h += `<div class="bg-gradient-to-r from-slate-600 to-slate-800 rounded-2xl p-6 text-white mb-6">
+      <div class="flex justify-between items-center">
+        <div><h3 class="text-xl font-bold">👔 직원 관리</h3><p class="text-slate-300">최대 5명까지 등록 가능</p></div>
+        <div class="text-right"><div class="text-3xl font-bold">${staff.length}/5</div><div class="text-slate-300">등록됨</div></div>
+      </div>
+    </div>`;
+    
+    h += `<div class="flex justify-end mb-4">
+      <button onclick="openStaffModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl ${staff.length>=5?'opacity-50 cursor-not-allowed':''}" ${staff.length>=5?'disabled':''}>+ 직원 추가</button>
+    </div>`;
+    
+    if(staff.length){
+      h += '<div class="bg-white rounded-2xl border overflow-hidden">';
+      staff.forEach(s => {
+        const roleLabel = s.role === 'manager' ? '매니저' : '직원';
+        const roleColor = s.role === 'manager' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700';
+        h += `<div class="flex items-center gap-4 p-4 border-b">
+          <div class="w-12 h-12 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center text-xl font-bold">${s.name?.[0]||'?'}</div>
+          <div class="flex-1">
+            <div class="font-bold">${s.name}</div>
+            <div class="text-sm text-gray-500">${s.email}</div>
+          </div>
+          <span class="px-3 py-1 rounded-full text-xs ${roleColor}">${roleLabel}</span>
+          <button onclick="editStaff('${s.id}')" class="px-3 py-1 border rounded-lg text-sm">수정</button>
+          <button onclick="deleteStaff('${s.id}')" class="px-3 py-1 bg-red-100 text-red-600 rounded-lg text-sm">삭제</button>
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<div class="text-center py-12 text-gray-400"><div class="text-4xl mb-3">👔</div><p>등록된 직원이 없습니다</p></div>';
+    }
+    
+    h += `<div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-4">
+      <h4 class="font-bold text-amber-800 mb-2">💡 권한 설정</h4>
+      <p class="text-sm text-amber-700">직원별로 접근 가능한 메뉴를 설정할 수 있습니다. 수정 버튼을 눌러 권한을 관리하세요.</p>
+    </div>`;
+  }
+
+  // 직원 근태 (Business)
+  else if(tab==='staffAtt'){
+    h += `<div class="bg-gradient-to-r from-teal-500 to-cyan-500 rounded-2xl p-6 text-white mb-6">
+      <div class="flex justify-between items-center">
+        <div><h3 class="text-xl font-bold">⏰ 직원 근태 관리</h3><p class="text-teal-100">${todayStr}</p></div>
+        <div class="text-right"><div class="text-3xl font-bold">${staffAttendance.filter(a=>a.check_in).length}/${staff.length}</div><div class="text-teal-100">출근</div></div>
+      </div>
+    </div>`;
+    
+    if(staff.length){
+      h += '<div class="bg-white rounded-2xl border overflow-hidden">';
+      staff.forEach(s => {
+        const att = staffAttendance.find(a => a.staff_id === s.id);
+        const checkIn = att?.check_in || '-';
+        const checkOut = att?.check_out || '-';
+        const status = att?.check_in ? (att?.check_out ? '퇴근' : '근무중') : '미출근';
+        const statusColor = status === '근무중' ? 'text-green-600' : status === '퇴근' ? 'text-gray-500' : 'text-red-500';
+        h += `<div class="flex items-center gap-4 p-4 border-b">
+          <div class="w-10 h-10 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center font-bold">${s.name?.[0]||'?'}</div>
+          <div class="flex-1 font-medium">${s.name}</div>
+          <div class="text-center"><div class="text-xs text-gray-500">출근</div><div class="font-mono">${checkIn}</div></div>
+          <div class="text-center"><div class="text-xs text-gray-500">퇴근</div><div class="font-mono">${checkOut}</div></div>
+          <div class="w-16 text-center font-medium ${statusColor}">${status}</div>
+          <div class="flex gap-1">
+            ${!att?.check_in ? `<button onclick="staffCheckIn('${s.id}')" class="px-3 py-1 bg-green-600 text-white rounded-lg text-sm">출근</button>` : ''}
+            ${att?.check_in && !att?.check_out ? `<button onclick="staffCheckOut('${s.id}')" class="px-3 py-1 bg-gray-600 text-white rounded-lg text-sm">퇴근</button>` : ''}
+          </div>
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<div class="text-center py-12 text-gray-400"><div class="text-4xl mb-3">⏰</div><p>등록된 직원이 없습니다</p></div>';
+    }
+  }
+
+  // 급여 관리 (Business)
+  else if(tab==='salary'){
+    const currentMonth = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long'});
+    const totalSalary = salaries.reduce((a,s)=>a+(s.base_amount||0)+(s.bonus||0)-(s.deduction||0),0);
+    
+    h += `<div class="bg-gradient-to-r from-emerald-500 to-green-600 rounded-2xl p-6 text-white mb-6">
+      <div class="flex justify-between items-center">
+        <div><h3 class="text-xl font-bold">💵 급여 관리</h3><p class="text-emerald-100">${currentMonth}</p></div>
+        <div class="text-right"><div class="text-3xl font-bold">${(totalSalary/10000).toFixed(0)}만원</div><div class="text-emerald-100">총 급여</div></div>
+      </div>
+    </div>`;
+    
+    if(staff.length){
+      h += '<div class="bg-white rounded-2xl border overflow-hidden">';
+      h += '<div class="grid grid-cols-7 gap-2 p-4 bg-gray-50 border-b text-sm font-medium text-gray-600"><div>직원</div><div class="text-right">기본급</div><div class="text-right">수당</div><div class="text-right">공제</div><div class="text-right">실지급액</div><div class="text-center">상태</div><div></div></div>';
+      staff.forEach(s => {
+        const sal = salaries.find(x => x.staff_id === s.id) || {base_amount:0,bonus:0,deduction:0,paid:false};
+        const total = (sal.base_amount||0) + (sal.bonus||0) - (sal.deduction||0);
+        h += `<div class="grid grid-cols-7 gap-2 p-4 border-b items-center text-sm">
+          <div class="font-medium">${s.name}</div>
+          <div class="text-right">${(sal.base_amount||0).toLocaleString()}</div>
+          <div class="text-right text-green-600">+${(sal.bonus||0).toLocaleString()}</div>
+          <div class="text-right text-red-600">-${(sal.deduction||0).toLocaleString()}</div>
+          <div class="text-right font-bold">${total.toLocaleString()}</div>
+          <div class="text-center"><span class="px-2 py-1 rounded text-xs ${sal.paid?'bg-green-100 text-green-700':'bg-amber-100 text-amber-700'}">${sal.paid?'지급완료':'미지급'}</span></div>
+          <div><button onclick="editSalary('${s.id}')" class="px-3 py-1 border rounded text-xs">수정</button></div>
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<div class="text-center py-12 text-gray-400"><div class="text-4xl mb-3">💵</div><p>등록된 직원이 없습니다</p></div>';
+    }
+  }
+
+  // 다지점 관리 (Business)
+  else if(tab==='branches'){
+    h += `<div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white mb-6">
+      <div class="flex justify-between items-center">
+        <div><h3 class="text-xl font-bold">🏢 다지점 관리</h3><p class="text-indigo-200">본점: ${academy.name}</p></div>
+        <div class="text-right"><div class="text-3xl font-bold">${branches.length}</div><div class="text-indigo-200">지점</div></div>
+      </div>
+    </div>`;
+    
+    h += `<div class="flex justify-end mb-4">
+      <button onclick="openBranchModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl">+ 지점 추가</button>
+    </div>`;
+    
+    h += '<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">';
+    // 본점
+    h += `<div class="bg-white rounded-2xl border-2 border-indigo-500 p-5">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center text-xl">🏠</div>
+        <div><div class="font-bold">${academy.name}</div><div class="text-xs text-indigo-600">본점</div></div>
+      </div>
+      <div class="text-sm text-gray-500">${academy.address||'주소 미등록'}</div>
+      <div class="mt-3 pt-3 border-t flex justify-between text-sm">
+        <span>원생 ${students.length}명</span>
+        <span>직원 ${staff.length}명</span>
+      </div>
+    </div>`;
+    // 지점들
+    branches.forEach(b => {
+      h += `<div class="bg-white rounded-2xl border p-5">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-12 h-12 bg-gray-100 text-gray-600 rounded-xl flex items-center justify-center text-xl">🏢</div>
+          <div><div class="font-bold">${b.branch_name||b.name}</div><div class="text-xs text-gray-500">지점</div></div>
+        </div>
+        <div class="text-sm text-gray-500">${b.address||'주소 미등록'}</div>
+        <div class="mt-3 pt-3 border-t flex justify-between">
+          <button onclick="switchBranch('${b.id}')" class="text-sm text-indigo-600">전환</button>
+          <button onclick="deleteBranch('${b.id}')" class="text-sm text-red-500">삭제</button>
+        </div>
+      </div>`;
+    });
+    h += '</div>';
+  }
+
+  // 설정
+  else if(tab==='settings'){
+    h += `<div class="bg-white rounded-2xl border p-6 mb-4">
+      <h2 class="font-bold mb-4">🏫 학원 정보</h2>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div><label class="text-sm text-gray-600">학원명</label><input type="text" id="setName" value="${academy.name||''}" class="w-full px-4 py-2 border rounded-xl mt-1"></div>
+        <div><label class="text-sm text-gray-600">원장명</label><input type="text" id="setOwner" value="${academy.owner||''}" class="w-full px-4 py-2 border rounded-xl mt-1"></div>
+        <div class="md:col-span-2"><label class="text-sm text-gray-600">주소</label><input type="text" id="setAddress" value="${academy.address||''}" class="w-full px-4 py-2 border rounded-xl mt-1"></div>
+        <div><label class="text-sm text-gray-600">연락처</label><input type="text" id="setPhone" value="${academy.phone||''}" class="w-full px-4 py-2 border rounded-xl mt-1"></div>
+      </div>
+      <button onclick="saveSettings()" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl">저장</button>
+    </div>`;
+  }
+
+  h += '</div></main></div>';
+
+  // 모달
+  if(modal==='addStudent') h += renderStudentModal();
+  if(modal==='sms') h += renderSmsModal();
+  if(modal==='docPreview' && currentDoc) h += renderDocModal();
+  if(modal==='report') h += renderReportModal();
+  if(modal==='staff') h += renderStaffModal();
+  if(modal==='salary') h += renderSalaryModal();
+
+  return h;
+}
+
+// 직원 모달
+function renderStaffModal(){
+  const s = editingStaffId ? staff.find(x=>x.id===editingStaffId) : null;
+  if(s){
+    staffFormData = {name:s.name,email:s.email,password:'',role:s.role,permissions:s.permissions||{}};
+  }
+  
+  return `<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick="if(event.target===this){closeStaffModal();}">
+    <div class="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between"><span class="font-bold">${s?'직원 수정':'직원 추가'}</span><button onclick="closeStaffModal()">✕</button></div>
+      <div class="p-4 space-y-3">
+        <input type="text" id="staffName" value="${staffFormData.name}" class="w-full px-4 py-2 border rounded-xl" placeholder="이름 *">
+        <input type="email" id="staffEmail" value="${staffFormData.email}" class="w-full px-4 py-2 border rounded-xl" placeholder="이메일 (로그인용) *">
+        <input type="password" id="staffPw" class="w-full px-4 py-2 border rounded-xl" placeholder="${s?'비밀번호 (변경시만)':'비밀번호 *'}">
+        <select id="staffRole" class="w-full px-4 py-2 border rounded-xl">
+          <option value="staff" ${staffFormData.role==='staff'?'selected':''}>직원</option>
+          <option value="manager" ${staffFormData.role==='manager'?'selected':''}>매니저</option>
+        </select>
+        <div class="bg-gray-50 rounded-xl p-3">
+          <div class="text-sm font-medium mb-2">접근 권한</div>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <label class="flex items-center gap-2"><input type="checkbox" id="perm_students" ${staffFormData.permissions?.students?'checked':''}> 원생관리</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="perm_attendance" ${staffFormData.permissions?.attendance?'checked':''}> 출결관리</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="perm_payments" ${staffFormData.permissions?.payments?'checked':''}> 수강료</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="perm_notices" ${staffFormData.permissions?.notices?'checked':''}> 공지사항</label>
+          </div>
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button onclick="closeStaffModal()" class="flex-1 py-2 border rounded-xl">취소</button>
+          <button onclick="saveStaff()" class="flex-1 py-2 bg-indigo-600 text-white rounded-xl">저장</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// 급여 모달
+function renderSalaryModal(){
+  const s = staff.find(x=>x.id===editingStaffId);
+  const sal = salaries.find(x=>x.staff_id===editingStaffId) || {base_amount:0,bonus:0,deduction:0,paid:false};
+  
+  return `<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick="if(event.target===this){modal='';editingStaffId=null;render();}">
+    <div class="bg-white rounded-2xl w-full max-w-md">
+      <div class="p-4 border-b flex justify-between"><span class="font-bold">${s?.name} 급여 수정</span><button onclick="modal='';editingStaffId=null;render()">✕</button></div>
+      <div class="p-4 space-y-3">
+        <div><label class="text-sm text-gray-600">기본급</label><input type="number" id="salBase" value="${sal.base_amount||0}" class="w-full px-4 py-2 border rounded-xl mt-1"></div>
+        <div><label class="text-sm text-gray-600">수당</label><input type="number" id="salBonus" value="${sal.bonus||0}" class="w-full px-4 py-2 border rounded-xl mt-1"></div>
+        <div><label class="text-sm text-gray-600">공제</label><input type="number" id="salDeduct" value="${sal.deduction||0}" class="w-full px-4 py-2 border rounded-xl mt-1"></div>
+        <label class="flex items-center gap-2"><input type="checkbox" id="salPaid" ${sal.paid?'checked':''}> 지급완료</label>
+        <div class="flex gap-2 pt-2">
+          <button onclick="modal='';editingStaffId=null;render()" class="flex-1 py-2 border rounded-xl">취소</button>
+          <button onclick="saveSalary()" class="flex-1 py-2 bg-indigo-600 text-white rounded-xl">저장</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// 리포트 모달
+function renderReportModal(){
+  const s = students.find(x=>x.id===reportStudentId);
+  const currentMonth = new Date().toLocaleDateString('ko-KR', {year:'numeric', month:'long'});
+  
+  return `<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick="if(event.target===this){modal='';reportStudentId='';render();}">
+    <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between"><span class="font-bold">📈 ${s?.name||''} 학습 리포트</span><button onclick="modal='';reportStudentId='';render()">✕</button></div>
+      <div class="p-4 space-y-4">
+        <div class="bg-blue-50 p-3 rounded-xl text-center">
+          <div class="text-sm text-blue-600">${currentMonth}</div>
+        </div>
+        <div>
+          <label class="text-sm font-medium">학습 내용 및 평가</label>
+          <textarea id="reportContent" class="w-full p-3 border rounded-xl mt-1" rows="5" placeholder="이번 달 학습 내용과 성취도를 작성하세요..."></textarea>
+        </div>
+        <div>
+          <label class="text-sm font-medium">선생님 코멘트</label>
+          <textarea id="reportMemo" class="w-full p-3 border rounded-xl mt-1" rows="3" placeholder="학부모님께 전달할 메시지..."></textarea>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="modal='';reportStudentId='';render()" class="flex-1 py-3 border rounded-xl">취소</button>
+          <button onclick="saveReport()" class="flex-1 py-3 bg-blue-600 text-white rounded-xl">저장</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// 원생 상세
+function renderStudentDetail(){
+  const s = students.find(x=>x.id===viewStudentId);
+  if(!s) return '<p>원생 정보 없음</p>';
+  const scheduleStr = s.schedule ? Object.entries(s.schedule).map(([d,t])=>`${d} ${t}`).join(', ') : (s.days||[]).join(' ')+' '+(s.time||'');
+  
+  let h = '<div class="max-w-2xl">';
+  h += `<button onclick="viewStudentId=null;render()" class="mb-4 text-indigo-600">← 목록으로</button>`;
+  
+  h += `<div class="bg-white rounded-2xl border p-6 mb-4">
+    <div class="flex items-center gap-4 mb-4">
+      <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl font-bold">${s.name?.[0]||'?'}</div>
+      <div><h2 class="text-xl font-bold">${s.name}</h2><p class="text-gray-500">${s.course||''} · ${s.level||''}</p></div>
+      <button onclick="openEditStudent('${s.id}')" class="ml-auto px-4 py-2 border rounded-xl text-sm">수정</button>
+    </div>
+    <div class="grid grid-cols-2 gap-4 text-sm">
+      <div><span class="text-gray-500">연락처</span><div class="font-medium">${s.phone||'-'}</div></div>
+      <div><span class="text-gray-500">학부모</span><div class="font-medium">${s.parent_phone||'-'}</div></div>
+      <div><span class="text-gray-500">수업일정</span><div class="font-medium">${scheduleStr||'-'}</div></div>
+      <div><span class="text-gray-500">수강료</span><div class="font-medium ${s.paid?'':'text-red-600'}">${fmt(s.fee||0)} (${s.paid?'완료':'미납'})</div></div>
+    </div>
+  </div>`;
+
+  // 메모
+  h += `<div class="bg-white rounded-2xl border p-6 mb-4">
+    <h3 class="font-bold mb-3">📝 메모</h3>
+    <textarea id="studentMemo" class="w-full p-3 border rounded-xl" rows="3" placeholder="메모 입력...">${s.memo||''}</textarea>
+    <button onclick="saveMemo('${s.id}')" class="mt-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm">저장</button>
+  </div>`;
+
+  h += '</div>';
+  return h;
+}
+
+// 원생 모달
+function renderStudentModal(){
+  const s = editingId ? students.find(x=>x.id===editingId) : null;
+  
+  let h = `<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick="if(event.target===this){closeModal();}">
+    <div class="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between"><span class="font-bold">${s?'원생 수정':'원생 등록'}</span><button onclick="closeModal()">✕</button></div>
+      <div class="p-4 space-y-3">
+        <input type="text" id="sName" value="${formData.name}" oninput="formData.name=this.value" class="w-full px-4 py-2 border rounded-xl" placeholder="이름 *">
+        <input type="tel" id="sPhone" value="${formData.phone}" oninput="formData.phone=this.value" class="w-full px-4 py-2 border rounded-xl" placeholder="연락처">
+        <input type="tel" id="sPPhone" value="${formData.pPhone}" oninput="formData.pPhone=this.value" class="w-full px-4 py-2 border rounded-xl" placeholder="학부모 연락처">
+        <div class="grid grid-cols-2 gap-2">
+          <input type="text" id="sCourse" value="${formData.course}" oninput="formData.course=this.value" class="px-4 py-2 border rounded-xl" placeholder="과목">
+          <input type="text" id="sLevel" value="${formData.level}" oninput="formData.level=this.value" class="px-4 py-2 border rounded-xl" placeholder="레벨">
+        </div>
+        <div class="bg-indigo-50 rounded-xl p-3">
+          <div class="text-sm font-medium mb-2">수업 일정 (요일별 시간)</div>
+          <div class="space-y-2">`;
+  ['월','화','수','목','금','토','일'].forEach(d=>{
+    const hasDay = formData.schedule[d] !== undefined;
+    const time = formData.schedule[d] || '16:00';
+    h += `<div class="flex items-center gap-2">
+      <button type="button" onclick="toggleDaySchedule('${d}')" class="w-10 h-10 rounded-lg text-sm font-bold ${hasDay?'bg-indigo-600 text-white':'bg-white border'}">${d}</button>
+      ${hasDay ? `<input type="time" value="${time}" onchange="formData.schedule['${d}']=this.value" class="flex-1 px-3 py-2 border rounded-lg"><span class="text-xs text-gray-500">${d}요일</span>` : '<span class="text-gray-400 text-sm">수업 없음</span>'}
+    </div>`;
+  });
+  h += `</div></div>
+        <input type="number" id="sFee" value="${formData.fee}" oninput="formData.fee=parseInt(this.value)||0" class="w-full px-4 py-2 border rounded-xl" placeholder="수강료">
+        <label class="flex items-center gap-2"><input type="checkbox" id="sPaid" ${formData.paid?'checked':''} onchange="formData.paid=this.checked" class="w-5 h-5">납부완료</label>
+        <div class="flex gap-2">
+          <button onclick="closeModal()" class="flex-1 py-2 border rounded-xl">취소</button>
+          ${editingId ? `<button onclick="deleteStudent('${editingId}')" class="py-2 px-4 bg-red-500 text-white rounded-xl">삭제</button>` : ''}
+          <button onclick="saveStudent()" class="flex-1 py-2 bg-indigo-600 text-white rounded-xl">${s?'수정':'등록'}</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  return h;
+}
+
+// SMS 모달
+function renderSmsModal(){
+  const selIds = Object.keys(selectedStudents).filter(k=>selectedStudents[k]);
+  const selStudents = selIds.map(id=>students.find(s=>s.id===id)).filter(Boolean);
+  const defaultMsg = `[${academy.name}]\n\n안녕하세요.\n\n${selStudents.map(s=>s.name).join(', ')} 학생 출석 안내드립니다.`;
+  
+  return `<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick="if(event.target===this){modal='';render();}">
+    <div class="bg-white rounded-2xl w-full max-w-md">
+      <div class="p-4 border-b flex justify-between"><span class="font-bold">📱 문자 보내기</span><button onclick="modal='';render()">✕</button></div>
+      <div class="p-4">
+        <div class="mb-3"><span class="text-sm text-gray-500">받는 사람</span>
+          <div class="flex flex-wrap gap-1 mt-1">${selStudents.map(s=>`<span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-sm">${s.name}</span>`).join('')}</div>
+        </div>
+        <div class="mb-3"><span class="text-sm text-gray-500">내용</span><textarea id="smsContent" class="w-full p-3 border rounded-xl mt-1" rows="6">${defaultMsg}</textarea></div>
+        <button onclick="sendSMS()" class="w-full py-3 bg-blue-600 text-white rounded-xl font-bold">보내기</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// 문서 모달
+function renderDocModal(){
+  const d = currentDoc;
+  const s = docStudentId ? students.find(x=>x.id===docStudentId) : null;
+  const content = getDocContent(d, s);
+  
+  return `<div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onclick="if(event.target===this){modal='';currentDoc=null;render();}">
+    <div class="bg-white rounded-2xl w-full max-w-3xl max-h-[95vh] overflow-hidden flex flex-col">
+      <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+        <span class="font-bold">${d.icon} ${d.name}</span>
+        <div class="flex gap-2">
+          <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm">🖨️ 인쇄</button>
+          <button onclick="modal='';currentDoc=null;render()" class="px-4 py-2 bg-gray-200 rounded-xl">✕</button>
+        </div>
+      </div>
+      <div class="p-2 bg-amber-50 text-amber-800 text-sm text-center">💡 문서를 클릭하여 직접 편집할 수 있습니다</div>
+      <div class="flex-1 overflow-y-auto bg-gray-300 p-6 print-area">
+        <div id="docContent" contenteditable="true" class="bg-white shadow-xl mx-auto cursor-text" style="width:210mm;min-height:297mm;padding:20mm;">${content}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function getDocContent(doc, stu){
+  const s = stu || {name:'___________',course:'___________',level:'___',phone:'_______________',fee:0};
+  const a = academy;
+  const header = `<div style="border-bottom:2px solid #333;padding-bottom:15px;margin-bottom:30px;text-align:center;"><div style="font-size:16pt;font-weight:bold;">${a.name}</div><div style="font-size:9pt;color:#666;">${a.address||''} | Tel: ${a.phone||''}</div></div>`;
+  const footer = `<div style="margin-top:80px;text-align:center;"><p>${todayStr}</p><p style="font-size:14pt;font-weight:bold;margin-top:30px;">${a.name}</p><p>원장 ${a.owner} (인)</p></div>`;
+  
+  if(doc.name==='재원증명서') return header+`<h1 style="text-align:center;font-size:24pt;letter-spacing:10px;margin:50px 0;">재 원 증 명 서</h1><table style="width:100%;border-collapse:collapse;margin:30px 0;"><tr><td style="border:1px solid #333;padding:12px;width:25%;background:#f5f5f5;font-weight:bold;">성 명</td><td style="border:1px solid #333;padding:12px;">${s.name}</td></tr><tr><td style="border:1px solid #333;padding:12px;background:#f5f5f5;font-weight:bold;">수강과목</td><td style="border:1px solid #333;padding:12px;">${s.course||''}</td></tr><tr><td style="border:1px solid #333;padding:12px;background:#f5f5f5;font-weight:bold;">레 벨</td><td style="border:1px solid #333;padding:12px;">${s.level||''}</td></tr></table><div style="text-align:center;margin:60px 0;font-size:14pt;">위 학생은 본 학원에 재원 중임을 증명합니다.</div>`+footer;
+  
+  if(doc.name==='수강료영수증') return header+`<h1 style="text-align:center;font-size:24pt;letter-spacing:10px;margin:50px 0;">영 수 증</h1><div style="text-align:center;margin:40px 0;padding:30px;border:3px solid #333;"><p>금 액</p><p style="font-size:28pt;font-weight:bold;color:#c00;">${(s.fee||0).toLocaleString()}원</p></div><table style="width:100%;border-collapse:collapse;"><tr><td style="border:1px solid #333;padding:12px;width:25%;background:#f5f5f5;">내 용</td><td style="border:1px solid #333;padding:12px;">${s.course||''} 수강료</td></tr><tr><td style="border:1px solid #333;padding:12px;background:#f5f5f5;">원 생</td><td style="border:1px solid #333;padding:12px;">${s.name}</td></tr></table><p style="text-align:center;margin:50px 0;">위 금액을 정히 영수함.</p>`+footer;
+  
+  return header+`<h1 style="text-align:center;font-size:22pt;margin:50px 0;">${doc.name}</h1><p style="text-align:center;color:#666;margin:30px 0;">내용을 입력하세요.</p>`+footer;
+}
+
+// 함수들
+function openAddStudent(){
+  editingId = null;
+  formData = {name:'',phone:'',pPhone:'',course:'',level:'',fee:200000,paid:false,schedule:{},memo:''};
+  modal = 'addStudent';
+  render();
+}
+
+function openEditStudent(id){
+  const s = students.find(x=>x.id===id);
+  if(!s) return;
+  editingId = id;
+  formData = {
+    name: s.name || '',
+    phone: s.phone || '',
+    pPhone: s.parent_phone || '',
+    course: s.course || '',
+    level: s.level || '',
+    fee: s.fee || 200000,
+    paid: s.paid || false,
+    schedule: s.schedule || {},
+    memo: s.memo || ''
+  };
+  if(!s.schedule && s.days && s.days.length){
+    formData.schedule = {};
+    s.days.forEach(d => { formData.schedule[d] = s.time || '16:00'; });
+  }
+  modal = 'addStudent';
+  render();
+}
+
+function closeModal(){
+  modal = '';
+  editingId = null;
+  render();
+}
+
+function toggleDaySchedule(d){
+  if(formData.schedule[d] !== undefined){
+    delete formData.schedule[d];
+  } else {
+    formData.schedule[d] = '16:00';
+  }
+  render();
+}
+
+async function saveStudent(){
+  if(!formData.name){alert('이름을 입력하세요');return;}
+  const data = {
+    academy_id: academy.id,
+    name: formData.name,
+    phone: formData.phone,
+    parent_phone: formData.pPhone,
+    course: formData.course,
+    level: formData.level,
+    fee: formData.fee,
+    paid: formData.paid,
+    schedule: formData.schedule,
+    days: Object.keys(formData.schedule),
+    time: Object.values(formData.schedule)[0] || '',
+    memo: formData.memo
+  };
+  loading=true;render();
+  if(editingId){
+    await db.from('students').update(data).eq('id',editingId);
+  } else {
+    await db.from('students').insert(data);
+  }
+  await loadData();
+  modal='';editingId=null;
+  loading=false;render();
+}
+
+async function deleteStudent(id){
+  if(!confirm('정말 삭제하시겠습니까?')) return;
+  loading=true;render();
+  await db.from('students').delete().eq('id',id);
+  await loadData();
+  modal='';editingId=null;viewStudentId=null;
+  loading=false;render();
+}
+
+async function saveMemo(id){
+  const memo = document.getElementById('studentMemo').value;
+  await db.from('students').update({memo}).eq('id',id);
+  const s = students.find(x=>x.id===id);
+  if(s) s.memo = memo;
+  alert('저장 완료!');
+}
+
+async function toggleAtt(id){
+  const exists = attendance[id];
+  if(exists){
+    await db.from('attendance').delete().eq('student_id',id).eq('date',todayISO);
+    // 포인트 차감
+    const s = students.find(x => x.id === id);
+    if (s) {
+      await db.from('students').update({ points: Math.max(0, (s.points || 0) - 10) }).eq('id', id);
+    }
+    delete attendance[id];
+  } else {
+    await db.from('attendance').insert({student_id:id,date:todayISO,status:'출석'});
+    // 포인트 추가
+    const s = students.find(x => x.id === id);
+    if (s) {
+      await db.from('students').update({ points: (s.points || 0) + 10 }).eq('id', id);
+    }
+    attendance[id]='출석';
+  }
+  await loadData();
+  render();
+}
+
+function toggleSelect(id){selectedStudents[id]=!selectedStudents[id];render();}
+
+async function markPaid(id){
+  await db.from('students').update({paid:true,paid_date:todayISO}).eq('id',id);
+  await loadData();
+  render();
+}
+
+async function addTodo(){
+  const text=prompt('할 일:');
+  if(!text)return;
+  await db.from('todos').insert({academy_id:academy.id,text});
+  await loadData();
+  render();
+}
+
+async function toggleTodo(id){
+  const t=todos.find(x=>x.id===id);
+  if(t){
+    await db.from('todos').update({done:!t.done}).eq('id',id);
+    await loadData();
+    render();
+  }
+}
+
+async function deleteTodo(id){
+  await db.from('todos').delete().eq('id',id);
+  await loadData();
+  render();
+}
+
+async function addNotice(){
+  const title=prompt('공지 제목:');
+  if(!title)return;
+  const content=prompt('내용:')||'';
+  await db.from('notices').insert({academy_id:academy.id,title,content});
+  await loadData();
+  render();
+}
+
+async function deleteNotice(id){
+  if(confirm('삭제?')){
+    await db.from('notices').delete().eq('id',id);
+    await loadData();
+    render();
+  }
+}
+
+async function sendReply(id){
+  const el=document.getElementById('reply'+id);
+  if(!el||!el.value)return;
+  await db.from('consults').update({reply:el.value,status:'완료'}).eq('id',id);
+  await loadData();
+  render();
+}
+
+async function addHomework(studentId){
+  const title=prompt('과제:');
+  if(!title)return;
+  await db.from('homework').insert({student_id:studentId,title});
+  await loadData();
+  render();
+}
+
+async function toggleHomework(id){
+  const hw=homework.find(x=>x.id===id);
+  if(hw){
+    await db.from('homework').update({done:!hw.done}).eq('id',id);
+    await loadData();
+    render();
+  }
+}
+
+async function deleteHomework(id){
+  await db.from('homework').delete().eq('id',id);
+  await loadData();
+  render();
+}
+
+function openDoc(id){
+  currentDoc = docs.find(d=>d.id===id);
+  modal = 'docPreview';
+  render();
+}
+
+function openSmsModal(){
+  const sel=Object.keys(selectedStudents).filter(k=>selectedStudents[k]);
+  if(!sel.length){alert('학생을 선택하세요');return;}
+  modal='sms';render();
+}
+
+function sendSMS(){
+  const content=document.getElementById('smsContent').value;
+  alert('문자 발송!\n(실제 발송은 Aligo 연동 필요)\n\n'+content);
+  modal='';selectedStudents={};render();
+}
+
+async function saveSettings(){
+  const data = {
+    name: document.getElementById('setName').value,
+    owner: document.getElementById('setOwner').value,
+    address: document.getElementById('setAddress').value,
+    phone: document.getElementById('setPhone').value
+  };
+  await db.from('academies').update(data).eq('id',academy.id);
+  academy = {...academy,...data};
+  alert('저장 완료!');
+  render();
+}
+
+function downloadExcel(){
+  const data=students.map(s=>{
+    const scheduleStr = s.schedule ? Object.entries(s.schedule).map(([d,t])=>`${d}${t}`).join(' ') : '';
+    return {이름:s.name,연락처:s.phone,과목:s.course,레벨:s.level,수강료:s.fee,납부:s.paid?'완료':'미납',수업일정:scheduleStr};
+  });
+  const ws=XLSX.utils.json_to_sheet(data);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'원생');
+  XLSX.writeFile(wb,'원생목록.xlsx');
+}
+
+// 사진 리사이즈 함수
+function resizeImage(file, maxWidth = 1200) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          resolve(blob);
+        }, 'image/jpeg', 0.8);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// 사진 업로드
+async function uploadPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  
+  // 월 업로드 제한 체크
+  const thisMonth = photos.filter(p => {
+    const d = new Date(p.created_at);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  
+  if (thisMonth.length >= 50) {
+    alert('월 50장 업로드 제한에 도달했습니다.');
+    return;
+  }
+  
+  if (!photoStudentId) {
+    alert('원생을 먼저 선택하세요.');
+    return;
+  }
+  
+  loading = true;
+  render();
+  
+  try {
+    // 이미지 리사이즈
+    const resizedBlob = await resizeImage(file);
+    
+    // Supabase Storage 업로드
+    const fileName = `${academy.id}/${Date.now()}.jpg`;
+    const { data: uploadData, error: uploadError } = await db.storage
+      .from('photos')
+      .upload(fileName, resizedBlob, { contentType: 'image/jpeg' });
+    
+    if (uploadError) {
+      // Storage 버킷이 없으면 Base64로 저장 (대안)
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = e.target.result;
+        const caption = prompt('사진 설명 (선택):') || '';
+        
+        await db.from('photos').insert({
+          academy_id: academy.id,
+          student_id: photoStudentId,
+          url: base64,
+          caption
+        });
+        
+        await loadData();
+        loading = false;
+        photoStudentId = '';
+        render();
+        alert('업로드 완료!');
+      };
+      reader.readAsDataURL(resizedBlob);
+      return;
+    }
+    
+    // 공개 URL 가져오기
+    const { data: urlData } = db.storage.from('photos').getPublicUrl(fileName);
+    const caption = prompt('사진 설명 (선택):') || '';
+    
+    await db.from('photos').insert({
+      academy_id: academy.id,
+      student_id: photoStudentId,
+      url: urlData.publicUrl,
+      caption
+    });
+    
+    await loadData();
+    loading = false;
+    photoStudentId = '';
+    render();
+    alert('업로드 완료!');
+    
+  } catch (err) {
+    console.error(err);
+    alert('업로드 실패: ' + err.message);
+    loading = false;
+    render();
+  }
+}
+
+// 사진 삭제
+async function deletePhoto(id) {
+  if (!confirm('이 사진을 삭제하시겠습니까?')) return;
+  
+  await db.from('photos').delete().eq('id', id);
+  await loadData();
+  render();
+}
+
+// 학습 리포트 모달
+function openReportModal(studentId) {
+  reportStudentId = studentId;
+  modal = 'report';
+  render();
+}
+
+// 학습 리포트 저장
+async function saveReport() {
+  const content = document.getElementById('reportContent').value;
+  const memo = document.getElementById('reportMemo').value;
+  const currentMonth = new Date().toISOString().slice(0,7);
+  
+  await db.from('reports').insert({
+    student_id: reportStudentId,
+    month: currentMonth,
+    content,
+    memo,
+    attendance_rate: 90,
+    homework_rate: 85
+  });
+  
+  await loadData();
+  modal = '';
+  reportStudentId = '';
+  render();
+  alert('리포트 저장 완료!');
+}
+
+// 보강 처리
+async function handleMakeup(id, status) {
+  await db.from('makeups').update({ status }).eq('id', id);
+  await loadData();
+  render();
+}
+
+// 채팅 전송
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const message = input.value.trim();
+  if (!message || !chatStudentId) return;
+  
+  await db.from('chats').insert({
+    academy_id: academy.id,
+    student_id: chatStudentId,
+    sender: 'admin',
+    message
+  });
+  
+  input.value = '';
+  await loadData();
+  render();
+  
+  // 스크롤 아래로
+  setTimeout(() => {
+    const chatDiv = document.getElementById('chatMessages');
+    if (chatDiv) chatDiv.scrollTop = chatDiv.scrollHeight;
+  }, 100);
+}
+
+// 포인트 조정
+async function adjustPoints(studentId) {
+  const s = students.find(x => x.id === studentId);
+  const current = s?.points || 0;
+  const input = prompt(`${s.name}의 포인트를 입력하세요 (현재: ${current}점)`, current);
+  if (input === null) return;
+  
+  const newPoints = parseInt(input) || 0;
+  await db.from('students').update({ points: newPoints }).eq('id', studentId);
+  await loadData();
+  render();
+}
+
+// 출석 시 포인트 추가 (toggleAtt 수정)
+async function toggleAttWithPoints(id) {
+  const exists = attendance[id];
+  if (exists) {
+    await db.from('attendance').delete().eq('student_id', id).eq('date', todayISO);
+    // 포인트 차감
+    const s = students.find(x => x.id === id);
+    if (s) {
+      await db.from('students').update({ points: Math.max(0, (s.points || 0) - 10) }).eq('id', id);
+    }
+    delete attendance[id];
+  } else {
+    await db.from('attendance').insert({ student_id: id, date: todayISO, status: '출석' });
+    // 포인트 추가
+    const s = students.find(x => x.id === id);
+    if (s) {
+      await db.from('students').update({ points: (s.points || 0) + 10 }).eq('id', id);
+    }
+    attendance[id] = '출석';
+  }
+  await loadData();
+  render();
+}
+
+// ========== Business 기능 ==========
+
+// 직원 모달 열기
+function openStaffModal(){
+  editingStaffId = null;
+  staffFormData = {name:'',email:'',password:'',role:'staff',permissions:{}};
+  modal = 'staff';
+  render();
+}
+
+function closeStaffModal(){
+  modal = '';
+  editingStaffId = null;
+  staffFormData = {name:'',email:'',password:'',role:'staff',permissions:{}};
+  render();
+}
+
+function editStaff(id){
+  editingStaffId = id;
+  modal = 'staff';
+  render();
+}
+
+// 직원 저장
+async function saveStaff(){
+  const name = document.getElementById('staffName').value.trim();
+  const email = document.getElementById('staffEmail').value.trim();
+  const password = document.getElementById('staffPw').value;
+  const role = document.getElementById('staffRole').value;
+  const permissions = {
+    students: document.getElementById('perm_students').checked,
+    attendance: document.getElementById('perm_attendance').checked,
+    payments: document.getElementById('perm_payments').checked,
+    notices: document.getElementById('perm_notices').checked
+  };
+  
+  if(!name || !email){alert('이름과 이메일을 입력하세요');return;}
+  if(!editingStaffId && !password){alert('비밀번호를 입력하세요');return;}
+  
+  if(editingStaffId){
+    const updateData = {name, email, role, permissions};
+    if(password) updateData.password = password;
+    await db.from('staff').update(updateData).eq('id', editingStaffId);
+  } else {
+    await db.from('staff').insert({
+      academy_id: academy.id,
+      name, email, password, role, permissions
+    });
+  }
+  
+  closeStaffModal();
+  await loadData();
+  render();
+}
+
+// 직원 삭제
+async function deleteStaff(id){
+  if(!confirm('이 직원을 삭제하시겠습니까?')) return;
+  await db.from('staff').delete().eq('id', id);
+  await loadData();
+  render();
+}
+
+// 직원 출근
+async function staffCheckIn(staffId){
+  const now = new Date().toTimeString().slice(0,5);
+  await db.from('staff_attendance').insert({
+    staff_id: staffId,
+    date: todayISO,
+    check_in: now,
+    status: '출근'
+  });
+  await loadData();
+  render();
+}
+
+// 직원 퇴근
+async function staffCheckOut(staffId){
+  const now = new Date().toTimeString().slice(0,5);
+  const att = staffAttendance.find(a => a.staff_id === staffId);
+  if(att){
+    await db.from('staff_attendance').update({check_out: now}).eq('id', att.id);
+  }
+  await loadData();
+  render();
+}
+
+// 급여 수정 모달
+function editSalary(staffId){
+  editingStaffId = staffId;
+  modal = 'salary';
+  render();
+}
+
+// 급여 저장
+async function saveSalary(){
+  const base = parseInt(document.getElementById('salBase').value) || 0;
+  const bonus = parseInt(document.getElementById('salBonus').value) || 0;
+  const deduction = parseInt(document.getElementById('salDeduct').value) || 0;
+  const paid = document.getElementById('salPaid').checked;
+  const currentMonth = new Date().toISOString().slice(0,7);
+  
+  const existing = salaries.find(s => s.staff_id === editingStaffId);
+  
+  if(existing){
+    await db.from('salaries').update({
+      base_amount: base,
+      bonus,
+      deduction,
+      paid,
+      paid_date: paid ? todayISO : null
+    }).eq('id', existing.id);
+  } else {
+    await db.from('salaries').insert({
+      staff_id: editingStaffId,
+      month: currentMonth,
+      base_amount: base,
+      bonus,
+      deduction,
+      paid,
+      paid_date: paid ? todayISO : null
+    });
+  }
+  
+  modal = '';
+  editingStaffId = null;
+  await loadData();
+  render();
+}
+
+// 지점 추가 모달
+function openBranchModal(){
+  const name = prompt('지점명을 입력하세요:');
+  if(!name) return;
+  addBranch(name);
+}
+
+// 지점 추가
+async function addBranch(branchName){
+  await db.from('academies').insert({
+    name: branchName,
+    branch_name: branchName,
+    parent_id: academy.id,
+    owner: academy.owner
+  });
+  await loadData();
+  render();
+}
+
+// 지점 삭제
+async function deleteBranch(id){
+  if(!confirm('이 지점을 삭제하시겠습니까?')) return;
+  await db.from('academies').delete().eq('id', id);
+  await loadData();
+  render();
+}
+
+// 지점 전환
+async function switchBranch(id){
+  const branch = branches.find(b => b.id === id);
+  if(branch){
+    academy = branch;
+    await loadData();
+    render();
+    alert(`${branch.branch_name || branch.name} 지점으로 전환되었습니다.`);
+  }
+}
+
+render();
+</script>
+</body>
+</html>

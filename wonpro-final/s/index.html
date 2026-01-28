@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>학생 페이지</title>
+  
+  <!-- PWA -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#f59e0b">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{font-family:-apple-system,'Malgun Gothic',sans-serif;box-sizing:border-box}
+  </style>
+</head>
+<body class="bg-gray-50">
+<div id="app"></div>
+<script>
+const SUPABASE_URL = 'https://sniabexwdgeepakkxxek.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuaWFiZXh3ZGdlZXBha2t4eGVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MDMxNzIsImV4cCI6MjA4NTA3OTE3Mn0.RsDQDyawjFk5voFLVouXDlTIXvhPrsziCD37ne-1jMU';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// URL에서 학원 코드 가져오기 (wonpro.pages.dev/s/ABC123)
+const pathParts = window.location.pathname.split('/');
+const academyCode = pathParts[pathParts.length - 1] || pathParts[pathParts.length - 2];
+
+let page = 'login';
+let academy = null;
+let student = null;
+let tab = 'home';
+let homework = [];
+let attendance = [];
+let notices = [];
+let ranking = [];
+let loading = false;
+
+// 쿠팡 광고 로직
+function getCoupangRate() {
+  const today = new Date();
+  const seed = today.getFullYear() * 10000 + (today.getMonth()+1) * 100 + today.getDate();
+  const x = Math.sin(seed) * 10000;
+  const rand = x - Math.floor(x);
+  return 3 + rand * 7;
+}
+
+function tryCoupangCookie() {
+  const rate = getCoupangRate();
+  if (Math.random() * 100 < rate) {
+    window.open('https://link.coupang.com/a/example', '_blank');
+  }
+}
+
+async function init() {
+  if (!academyCode || academyCode === 's') {
+    document.getElementById('app').innerHTML = '<div class="min-h-screen flex items-center justify-center text-gray-500">잘못된 접근입니다</div>';
+    return;
+  }
+  
+  const { data } = await db.from('academies').select('*').eq('code', academyCode).single();
+  if (!data) {
+    document.getElementById('app').innerHTML = '<div class="min-h-screen flex items-center justify-center text-gray-500">학원을 찾을 수 없습니다</div>';
+    return;
+  }
+  
+  academy = data;
+  render();
+}
+
+async function login() {
+  const phone = document.getElementById('phone').value.trim();
+  if (phone.length !== 4) {
+    alert('전화번호 뒤 4자리를 입력하세요');
+    return;
+  }
+  
+  loading = true;
+  render();
+  
+  const { data, error } = await db.from('students')
+    .select('*')
+    .eq('academy_id', academy.id)
+    .like('phone', `%${phone}`)
+    .single();
+  
+  if (error || !data) {
+    alert('등록된 정보를 찾을 수 없습니다');
+    loading = false;
+    render();
+    return;
+  }
+  
+  student = data;
+  tryCoupangCookie();
+  
+  await loadData();
+  loading = false;
+  page = 'main';
+  render();
+}
+
+async function loadData() {
+  const { data: hw } = await db.from('homework').select('*').eq('student_id', student.id).order('created_at', { ascending: false });
+  homework = hw || [];
+  
+  const { data: a } = await db.from('attendance').select('*').eq('student_id', student.id).order('date', { ascending: false }).limit(30);
+  attendance = a || [];
+  
+  const { data: n } = await db.from('notices').select('*').eq('academy_id', academy.id).order('created_at', { ascending: false }).limit(5);
+  notices = n || [];
+  
+  // 랭킹 (전체 학생)
+  const { data: all } = await db.from('students').select('id,name,points').eq('academy_id', academy.id).order('points', { ascending: false }).limit(10);
+  ranking = all || [];
+}
+
+function render() {
+  const app = document.getElementById('app');
+  
+  if (page === 'login') {
+    app.innerHTML = renderLogin();
+  } else {
+    app.innerHTML = renderMain();
+  }
+}
+
+function renderLogin() {
+  return `
+    <div class="min-h-screen flex flex-col">
+      <!-- 광고 -->
+      <div class="bg-amber-50 p-3 text-center text-sm">
+        <a href="https://link.coupang.com/a/example" target="_blank" class="text-amber-800">
+          🎮 게임/취미용품 쿠팡에서 확인!
+        </a>
+      </div>
+      
+      <div class="flex-1 flex items-center justify-center p-6">
+        <div class="w-full max-w-sm">
+          <div class="text-center mb-8">
+            <div class="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span class="text-4xl">👦</span>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800">${academy?.name || '학원'}</h1>
+            <p class="text-gray-500 mt-1">학생 페이지</p>
+          </div>
+          
+          <div class="bg-white rounded-2xl shadow-lg p-6">
+            <label class="text-sm text-gray-600 block mb-2">내 전화번호 뒤 4자리</label>
+            <input type="tel" id="phone" maxlength="4" placeholder="0000" 
+              class="w-full text-center text-3xl tracking-widest py-4 border-2 rounded-xl focus:border-amber-500 focus:outline-none"
+              onkeypress="if(event.key==='Enter')login()">
+            <button onclick="login()" 
+              class="w-full mt-4 py-4 bg-amber-500 text-white font-bold rounded-xl hover:bg-amber-600 transition-colors"
+              ${loading ? 'disabled' : ''}>
+              ${loading ? '로그인 중...' : '로그인'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMain() {
+  const tabs = [
+    { id: 'home', icon: '🏠', label: '홈' },
+    { id: 'homework', icon: '📝', label: '숙제' },
+    { id: 'attendance', icon: '📅', label: '출결' },
+    { id: 'ranking', icon: '🏆', label: '랭킹' }
+  ];
+  
+  let h = `
+    <div class="min-h-screen pb-20">
+      <!-- 헤더 -->
+      <div class="bg-gradient-to-r from-amber-400 to-orange-400 text-white p-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <div class="text-sm opacity-80">${academy.name}</div>
+            <div class="text-xl font-bold">${student.name} 👋</div>
+          </div>
+          <div class="text-right">
+            <div class="text-sm opacity-80">내 포인트</div>
+            <div class="text-2xl font-bold">${student.points || 0}점</div>
+          </div>
+        </div>
+      </div>
+  `;
+  
+  // 홈
+  if (tab === 'home') {
+    const todayAtt = attendance[0];
+    const pendingHw = homework.filter(h => !h.done).length;
+    const myRank = ranking.findIndex(r => r.id === student.id) + 1;
+    
+    h += `
+      <div class="p-4 space-y-4">
+        <!-- 오늘 상태 -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-white rounded-2xl p-4 shadow-sm text-center">
+            <div class="text-3xl mb-2">${todayAtt ? '✅' : '⏰'}</div>
+            <div class="text-sm text-gray-500">오늘 출결</div>
+            <div class="font-bold">${todayAtt ? todayAtt.status : '미출석'}</div>
+          </div>
+          <div class="bg-white rounded-2xl p-4 shadow-sm text-center">
+            <div class="text-3xl mb-2">📝</div>
+            <div class="text-sm text-gray-500">남은 숙제</div>
+            <div class="font-bold">${pendingHw}개</div>
+          </div>
+        </div>
+        
+        <!-- 내 랭킹 -->
+        <div class="bg-gradient-to-r from-yellow-400 to-amber-400 rounded-2xl p-5 text-white">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm opacity-90">출석 포인트 랭킹</div>
+              <div class="text-4xl font-bold mt-1">${myRank > 0 ? myRank + '위' : '-'}</div>
+            </div>
+            <div class="text-6xl">${myRank === 1 ? '🥇' : myRank === 2 ? '🥈' : myRank === 3 ? '🥉' : '🏆'}</div>
+          </div>
+        </div>
+        
+        <!-- 공지사항 -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm">
+          <h3 class="font-bold mb-3">📢 공지사항</h3>
+          ${notices.length 
+            ? notices.slice(0, 2).map(n => `
+                <div class="py-2 border-b last:border-0">
+                  <div class="font-medium text-sm">${n.title}</div>
+                  <div class="text-xs text-gray-400">${new Date(n.created_at).toLocaleDateString('ko-KR')}</div>
+                </div>
+              `).join('')
+            : '<p class="text-gray-400 text-sm">공지사항이 없습니다</p>'
+          }
+        </div>
+      </div>
+    `;
+  }
+  
+  // 숙제
+  else if (tab === 'homework') {
+    h += `
+      <div class="p-4">
+        <h2 class="font-bold text-lg mb-4">📝 숙제</h2>
+        <div class="space-y-3">
+          ${homework.length
+            ? homework.map(hw => `
+                <div class="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-4">
+                  <button onclick="toggleHomework('${hw.id}')" class="w-8 h-8 rounded-full border-2 flex items-center justify-center ${hw.done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-300'}">
+                    ${hw.done ? '✓' : ''}
+                  </button>
+                  <div class="flex-1 ${hw.done ? 'line-through text-gray-400' : ''}">
+                    <div class="font-medium">${hw.title}</div>
+                    <div class="text-xs text-gray-400">${hw.due_date || ''}</div>
+                  </div>
+                </div>
+              `).join('')
+            : '<p class="text-gray-400 text-center py-8">숙제가 없습니다 🎉</p>'
+          }
+        </div>
+      </div>
+    `;
+  }
+  
+  // 출결
+  else if (tab === 'attendance') {
+    const totalDays = attendance.length;
+    const presentDays = attendance.filter(a => a.status === '출석').length;
+    const rate = totalDays > 0 ? Math.round(presentDays / totalDays * 100) : 0;
+    
+    h += `
+      <div class="p-4">
+        <div class="bg-white rounded-2xl p-5 shadow-sm mb-4">
+          <div class="text-center">
+            <div class="text-5xl font-bold text-amber-500">${rate}%</div>
+            <div class="text-gray-500 mt-1">출석률 (${presentDays}/${totalDays}일)</div>
+          </div>
+        </div>
+        
+        <h2 class="font-bold text-lg mb-3">출결 기록</h2>
+        <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+          ${attendance.length
+            ? attendance.slice(0, 10).map(a => `
+                <div class="flex items-center justify-between p-3 border-b">
+                  <div class="text-sm">${a.date}</div>
+                  <span class="px-2 py-1 rounded text-xs ${a.status === '출석' ? 'bg-emerald-100 text-emerald-700' : a.status === '지각' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}">
+                    ${a.status}
+                  </span>
+                </div>
+              `).join('')
+            : '<p class="p-4 text-gray-400 text-center">기록이 없습니다</p>'
+          }
+        </div>
+      </div>
+    `;
+  }
+  
+  // 랭킹
+  else if (tab === 'ranking') {
+    h += `
+      <div class="p-4">
+        <h2 class="font-bold text-lg mb-4">🏆 출석 포인트 랭킹</h2>
+        <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+          ${ranking.map((r, i) => {
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}`;
+            const isMe = r.id === student.id;
+            return `
+              <div class="flex items-center gap-4 p-4 border-b ${isMe ? 'bg-amber-50' : ''} ${i < 3 ? 'bg-yellow-50' : ''}">
+                <div class="w-8 text-center font-bold ${i < 3 ? 'text-2xl' : ''}">${medal}</div>
+                <div class="flex-1">
+                  <span class="font-medium">${r.name}</span>
+                  ${isMe ? '<span class="ml-2 text-xs bg-amber-500 text-white px-2 py-0.5 rounded">나</span>' : ''}
+                </div>
+                <div class="font-bold text-amber-600">${r.points || 0}점</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+  
+  // 하단 탭
+  h += `
+      <nav class="fixed bottom-0 left-0 right-0 bg-white border-t flex">
+        ${tabs.map(t => `
+          <button onclick="tab='${t.id}';render()" class="flex-1 py-3 text-center ${tab === t.id ? 'text-amber-500' : 'text-gray-400'}">
+            <div class="text-xl">${t.icon}</div>
+            <div class="text-xs">${t.label}</div>
+          </button>
+        `).join('')}
+      </nav>
+    </div>
+  `;
+  
+  return h;
+}
+
+async function toggleHomework(id) {
+  const hw = homework.find(h => h.id === id);
+  if (!hw) return;
+  
+  await db.from('homework').update({ done: !hw.done }).eq('id', id);
+  await loadData();
+  render();
+}
+
+function logout() {
+  student = null;
+  page = 'login';
+  tab = 'home';
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
