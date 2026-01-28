@@ -813,13 +813,14 @@ function renderMain(){
     posts.forEach(p => {
       const isPinned = p.pinned;
       const timeAgo = getTimeAgo(p.created_at);
+      const visLabel = {all:'🌐 전체',parent:'👩‍👧 학부모만',student:'👦 학생만',member:'👤 성인만'}[p.visibility||'all'];
       h += `<div class="bg-white rounded-2xl border p-5 ${isPinned?'border-indigo-300 bg-indigo-50/30':''}">
         ${isPinned?'<div class="text-xs text-indigo-600 font-bold mb-2">📌 고정됨</div>':''}
         <div class="flex items-center gap-3 mb-3">
           <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">${p.author_name?.[0]||'?'}</div>
           <div class="flex-1">
             <div class="font-medium">${p.author_name||'익명'}</div>
-            <div class="text-xs text-gray-400">${p.author_type==='admin'?'👨‍💼 원장':p.author_type==='parent'?'👩‍👧 학부모':'👦 학생'} · ${timeAgo}</div>
+            <div class="text-xs text-gray-400">${p.author_type==='admin'?'👨‍💼 원장':p.author_type==='parent'?'👩‍👧 학부모':'👦 학생'} · ${timeAgo} · <span class="text-indigo-500">${visLabel}</span></div>
           </div>
           ${p.author_type==='admin'?`<button onclick="togglePin('${p.id}')" class="text-gray-400 hover:text-indigo-600">${isPinned?'📌':'📍'}</button><button onclick="deletePost('${p.id}')" class="text-gray-400 hover:text-red-500 ml-2">🗑️</button>`:''}
         </div>
@@ -1644,7 +1645,31 @@ function renderPostModal(){
         <button onclick="modal='';render()" class="text-gray-400">✕</button>
       </div>
       <div class="p-4">
-        <textarea id="postContent" rows="6" class="w-full px-4 py-3 border rounded-xl resize-none" placeholder="학부모/학생들과 공유할 내용을 입력하세요..."></textarea>
+        <textarea id="postContent" rows="5" class="w-full px-4 py-3 border rounded-xl resize-none" placeholder="학부모/학생들과 공유할 내용을 입력하세요..."></textarea>
+        
+        <!-- 공개 범위 선택 -->
+        <div class="mt-4 p-3 bg-gray-50 rounded-xl">
+          <div class="text-sm font-medium text-gray-700 mb-2">👁️ 공개 범위</div>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="flex items-center gap-2 p-2 bg-white rounded-lg cursor-pointer border hover:border-indigo-300">
+              <input type="radio" name="visibility" value="all" checked class="w-4 h-4 text-indigo-600">
+              <span class="text-sm">🌐 전체 공개</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 bg-white rounded-lg cursor-pointer border hover:border-indigo-300">
+              <input type="radio" name="visibility" value="parent" class="w-4 h-4 text-indigo-600">
+              <span class="text-sm">👩‍👧 학부모만</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 bg-white rounded-lg cursor-pointer border hover:border-indigo-300">
+              <input type="radio" name="visibility" value="student" class="w-4 h-4 text-indigo-600">
+              <span class="text-sm">👦 학생만</span>
+            </label>
+            <label class="flex items-center gap-2 p-2 bg-white rounded-lg cursor-pointer border hover:border-indigo-300">
+              <input type="radio" name="visibility" value="member" class="w-4 h-4 text-indigo-600">
+              <span class="text-sm">👤 성인회원만</span>
+            </label>
+          </div>
+        </div>
+        
         <div class="flex justify-between items-center mt-4">
           <button class="px-3 py-2 border rounded-xl text-sm">📷 사진 추가</button>
           <button onclick="savePost()" class="px-6 py-2 bg-indigo-600 text-white rounded-xl">게시</button>
@@ -2212,6 +2237,9 @@ async function savePost(){
   const content = document.getElementById('postContent').value;
   if(!content.trim()){alert('내용을 입력하세요');return;}
   
+  const visibility = document.querySelector('input[name="visibility"]:checked')?.value || 'all';
+  const visibilityLabel = {all:'전체',parent:'학부모만',student:'학생만',member:'성인회원만'}[visibility];
+  
   if(isDemo){
     posts.unshift({
       id:'post'+Date.now(),
@@ -2219,6 +2247,7 @@ async function savePost(){
       author_type:'admin',
       author_name:academy.owner+' 원장',
       content,
+      visibility,
       images:[],
       pinned:false,
       created_at:new Date().toISOString(),
@@ -2233,7 +2262,8 @@ async function savePost(){
     academy_id:academy.id,
     author_type:'admin',
     author_name:academy.owner+' 원장',
-    content
+    content,
+    visibility
   });
   modal='';
   await loadData();
