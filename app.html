@@ -62,6 +62,14 @@ let photoStudentId = '';
 let chatStudentId = '';
 let reportStudentId = '';
 
+// Business 변수
+let staff = [];
+let staffAttendance = [];
+let salaries = [];
+let branches = [];
+let editingStaffId = null;
+let staffFormData = {name:'',email:'',password:'',role:'staff',permissions:{}};
+
 let formData = {name:'',phone:'',pPhone:'',course:'',level:'',fee:200000,paid:false,schedule:{},memo:''};
 
 const dayList = ['일','월','화','수','목','금','토'];
@@ -199,6 +207,16 @@ async function loadData(){
   makeups = (m || []).filter(x => students.some(st => st.id === x.student_id));
   const {data:ch} = await db.from('chats').select('*').eq('academy_id',academy.id).order('created_at',{ascending:true});
   chats = ch || [];
+  // Business 데이터
+  const {data:st} = await db.from('staff').select('*').eq('academy_id',academy.id);
+  staff = st || [];
+  const {data:sa} = await db.from('staff_attendance').select('*').eq('date',todayISO);
+  staffAttendance = (sa || []).filter(x => staff.some(stf => stf.id === x.staff_id));
+  const currentMonth = new Date().toISOString().slice(0,7);
+  const {data:sal} = await db.from('salaries').select('*').eq('month',currentMonth);
+  salaries = (sal || []).filter(x => staff.some(stf => stf.id === x.staff_id));
+  const {data:br} = await db.from('academies').select('*').eq('parent_id',academy.id);
+  branches = br || [];
   const {data:a} = await db.from('attendance').select('*').eq('date',todayISO);
   attendance = {};
   (a||[]).forEach(att=>{attendance[att.student_id]=att.status;});
@@ -231,6 +249,10 @@ function renderMain(){
     {id:'consult',icon:'🗣️',label:'상담',badge:pendingConsults.length},
     {id:'homework',icon:'📝',label:'과제관리'},
     {id:'documents',icon:'📄',label:'문서템플릿'},
+    {id:'staff',icon:'👔',label:'직원관리',biz:true},
+    {id:'staffAtt',icon:'⏰',label:'직원근태',biz:true},
+    {id:'salary',icon:'💵',label:'급여관리',biz:true},
+    {id:'branches',icon:'🏢',label:'다지점',biz:true},
     {id:'settings',icon:'⚙️',label:'설정'}
   ];
 
@@ -759,6 +781,158 @@ function renderMain(){
     h += '</div>';
   }
 
+  // 직원 관리 (Business)
+  else if(tab==='staff'){
+    h += `<div class="bg-gradient-to-r from-slate-600 to-slate-800 rounded-2xl p-6 text-white mb-6">
+      <div class="flex justify-between items-center">
+        <div><h3 class="text-xl font-bold">👔 직원 관리</h3><p class="text-slate-300">최대 5명까지 등록 가능</p></div>
+        <div class="text-right"><div class="text-3xl font-bold">${staff.length}/5</div><div class="text-slate-300">등록됨</div></div>
+      </div>
+    </div>`;
+    
+    h += `<div class="flex justify-end mb-4">
+      <button onclick="openStaffModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl ${staff.length>=5?'opacity-50 cursor-not-allowed':''}" ${staff.length>=5?'disabled':''}>+ 직원 추가</button>
+    </div>`;
+    
+    if(staff.length){
+      h += '<div class="bg-white rounded-2xl border overflow-hidden">';
+      staff.forEach(s => {
+        const roleLabel = s.role === 'manager' ? '매니저' : '직원';
+        const roleColor = s.role === 'manager' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700';
+        h += `<div class="flex items-center gap-4 p-4 border-b">
+          <div class="w-12 h-12 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center text-xl font-bold">${s.name?.[0]||'?'}</div>
+          <div class="flex-1">
+            <div class="font-bold">${s.name}</div>
+            <div class="text-sm text-gray-500">${s.email}</div>
+          </div>
+          <span class="px-3 py-1 rounded-full text-xs ${roleColor}">${roleLabel}</span>
+          <button onclick="editStaff('${s.id}')" class="px-3 py-1 border rounded-lg text-sm">수정</button>
+          <button onclick="deleteStaff('${s.id}')" class="px-3 py-1 bg-red-100 text-red-600 rounded-lg text-sm">삭제</button>
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<div class="text-center py-12 text-gray-400"><div class="text-4xl mb-3">👔</div><p>등록된 직원이 없습니다</p></div>';
+    }
+    
+    h += `<div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-4">
+      <h4 class="font-bold text-amber-800 mb-2">💡 권한 설정</h4>
+      <p class="text-sm text-amber-700">직원별로 접근 가능한 메뉴를 설정할 수 있습니다. 수정 버튼을 눌러 권한을 관리하세요.</p>
+    </div>`;
+  }
+
+  // 직원 근태 (Business)
+  else if(tab==='staffAtt'){
+    h += `<div class="bg-gradient-to-r from-teal-500 to-cyan-500 rounded-2xl p-6 text-white mb-6">
+      <div class="flex justify-between items-center">
+        <div><h3 class="text-xl font-bold">⏰ 직원 근태 관리</h3><p class="text-teal-100">${todayStr}</p></div>
+        <div class="text-right"><div class="text-3xl font-bold">${staffAttendance.filter(a=>a.check_in).length}/${staff.length}</div><div class="text-teal-100">출근</div></div>
+      </div>
+    </div>`;
+    
+    if(staff.length){
+      h += '<div class="bg-white rounded-2xl border overflow-hidden">';
+      staff.forEach(s => {
+        const att = staffAttendance.find(a => a.staff_id === s.id);
+        const checkIn = att?.check_in || '-';
+        const checkOut = att?.check_out || '-';
+        const status = att?.check_in ? (att?.check_out ? '퇴근' : '근무중') : '미출근';
+        const statusColor = status === '근무중' ? 'text-green-600' : status === '퇴근' ? 'text-gray-500' : 'text-red-500';
+        h += `<div class="flex items-center gap-4 p-4 border-b">
+          <div class="w-10 h-10 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center font-bold">${s.name?.[0]||'?'}</div>
+          <div class="flex-1 font-medium">${s.name}</div>
+          <div class="text-center"><div class="text-xs text-gray-500">출근</div><div class="font-mono">${checkIn}</div></div>
+          <div class="text-center"><div class="text-xs text-gray-500">퇴근</div><div class="font-mono">${checkOut}</div></div>
+          <div class="w-16 text-center font-medium ${statusColor}">${status}</div>
+          <div class="flex gap-1">
+            ${!att?.check_in ? `<button onclick="staffCheckIn('${s.id}')" class="px-3 py-1 bg-green-600 text-white rounded-lg text-sm">출근</button>` : ''}
+            ${att?.check_in && !att?.check_out ? `<button onclick="staffCheckOut('${s.id}')" class="px-3 py-1 bg-gray-600 text-white rounded-lg text-sm">퇴근</button>` : ''}
+          </div>
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<div class="text-center py-12 text-gray-400"><div class="text-4xl mb-3">⏰</div><p>등록된 직원이 없습니다</p></div>';
+    }
+  }
+
+  // 급여 관리 (Business)
+  else if(tab==='salary'){
+    const currentMonth = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long'});
+    const totalSalary = salaries.reduce((a,s)=>a+(s.base_amount||0)+(s.bonus||0)-(s.deduction||0),0);
+    
+    h += `<div class="bg-gradient-to-r from-emerald-500 to-green-600 rounded-2xl p-6 text-white mb-6">
+      <div class="flex justify-between items-center">
+        <div><h3 class="text-xl font-bold">💵 급여 관리</h3><p class="text-emerald-100">${currentMonth}</p></div>
+        <div class="text-right"><div class="text-3xl font-bold">${(totalSalary/10000).toFixed(0)}만원</div><div class="text-emerald-100">총 급여</div></div>
+      </div>
+    </div>`;
+    
+    if(staff.length){
+      h += '<div class="bg-white rounded-2xl border overflow-hidden">';
+      h += '<div class="grid grid-cols-7 gap-2 p-4 bg-gray-50 border-b text-sm font-medium text-gray-600"><div>직원</div><div class="text-right">기본급</div><div class="text-right">수당</div><div class="text-right">공제</div><div class="text-right">실지급액</div><div class="text-center">상태</div><div></div></div>';
+      staff.forEach(s => {
+        const sal = salaries.find(x => x.staff_id === s.id) || {base_amount:0,bonus:0,deduction:0,paid:false};
+        const total = (sal.base_amount||0) + (sal.bonus||0) - (sal.deduction||0);
+        h += `<div class="grid grid-cols-7 gap-2 p-4 border-b items-center text-sm">
+          <div class="font-medium">${s.name}</div>
+          <div class="text-right">${(sal.base_amount||0).toLocaleString()}</div>
+          <div class="text-right text-green-600">+${(sal.bonus||0).toLocaleString()}</div>
+          <div class="text-right text-red-600">-${(sal.deduction||0).toLocaleString()}</div>
+          <div class="text-right font-bold">${total.toLocaleString()}</div>
+          <div class="text-center"><span class="px-2 py-1 rounded text-xs ${sal.paid?'bg-green-100 text-green-700':'bg-amber-100 text-amber-700'}">${sal.paid?'지급완료':'미지급'}</span></div>
+          <div><button onclick="editSalary('${s.id}')" class="px-3 py-1 border rounded text-xs">수정</button></div>
+        </div>`;
+      });
+      h += '</div>';
+    } else {
+      h += '<div class="text-center py-12 text-gray-400"><div class="text-4xl mb-3">💵</div><p>등록된 직원이 없습니다</p></div>';
+    }
+  }
+
+  // 다지점 관리 (Business)
+  else if(tab==='branches'){
+    h += `<div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white mb-6">
+      <div class="flex justify-between items-center">
+        <div><h3 class="text-xl font-bold">🏢 다지점 관리</h3><p class="text-indigo-200">본점: ${academy.name}</p></div>
+        <div class="text-right"><div class="text-3xl font-bold">${branches.length}</div><div class="text-indigo-200">지점</div></div>
+      </div>
+    </div>`;
+    
+    h += `<div class="flex justify-end mb-4">
+      <button onclick="openBranchModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl">+ 지점 추가</button>
+    </div>`;
+    
+    h += '<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">';
+    // 본점
+    h += `<div class="bg-white rounded-2xl border-2 border-indigo-500 p-5">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center text-xl">🏠</div>
+        <div><div class="font-bold">${academy.name}</div><div class="text-xs text-indigo-600">본점</div></div>
+      </div>
+      <div class="text-sm text-gray-500">${academy.address||'주소 미등록'}</div>
+      <div class="mt-3 pt-3 border-t flex justify-between text-sm">
+        <span>원생 ${students.length}명</span>
+        <span>직원 ${staff.length}명</span>
+      </div>
+    </div>`;
+    // 지점들
+    branches.forEach(b => {
+      h += `<div class="bg-white rounded-2xl border p-5">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-12 h-12 bg-gray-100 text-gray-600 rounded-xl flex items-center justify-center text-xl">🏢</div>
+          <div><div class="font-bold">${b.branch_name||b.name}</div><div class="text-xs text-gray-500">지점</div></div>
+        </div>
+        <div class="text-sm text-gray-500">${b.address||'주소 미등록'}</div>
+        <div class="mt-3 pt-3 border-t flex justify-between">
+          <button onclick="switchBranch('${b.id}')" class="text-sm text-indigo-600">전환</button>
+          <button onclick="deleteBranch('${b.id}')" class="text-sm text-red-500">삭제</button>
+        </div>
+      </div>`;
+    });
+    h += '</div>';
+  }
+
   // 설정
   else if(tab==='settings'){
     h += `<div class="bg-white rounded-2xl border p-6 mb-4">
@@ -780,8 +954,68 @@ function renderMain(){
   if(modal==='sms') h += renderSmsModal();
   if(modal==='docPreview' && currentDoc) h += renderDocModal();
   if(modal==='report') h += renderReportModal();
+  if(modal==='staff') h += renderStaffModal();
+  if(modal==='salary') h += renderSalaryModal();
 
   return h;
+}
+
+// 직원 모달
+function renderStaffModal(){
+  const s = editingStaffId ? staff.find(x=>x.id===editingStaffId) : null;
+  if(s){
+    staffFormData = {name:s.name,email:s.email,password:'',role:s.role,permissions:s.permissions||{}};
+  }
+  
+  return `<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick="if(event.target===this){closeStaffModal();}">
+    <div class="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div class="p-4 border-b flex justify-between"><span class="font-bold">${s?'직원 수정':'직원 추가'}</span><button onclick="closeStaffModal()">✕</button></div>
+      <div class="p-4 space-y-3">
+        <input type="text" id="staffName" value="${staffFormData.name}" class="w-full px-4 py-2 border rounded-xl" placeholder="이름 *">
+        <input type="email" id="staffEmail" value="${staffFormData.email}" class="w-full px-4 py-2 border rounded-xl" placeholder="이메일 (로그인용) *">
+        <input type="password" id="staffPw" class="w-full px-4 py-2 border rounded-xl" placeholder="${s?'비밀번호 (변경시만)':'비밀번호 *'}">
+        <select id="staffRole" class="w-full px-4 py-2 border rounded-xl">
+          <option value="staff" ${staffFormData.role==='staff'?'selected':''}>직원</option>
+          <option value="manager" ${staffFormData.role==='manager'?'selected':''}>매니저</option>
+        </select>
+        <div class="bg-gray-50 rounded-xl p-3">
+          <div class="text-sm font-medium mb-2">접근 권한</div>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <label class="flex items-center gap-2"><input type="checkbox" id="perm_students" ${staffFormData.permissions?.students?'checked':''}> 원생관리</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="perm_attendance" ${staffFormData.permissions?.attendance?'checked':''}> 출결관리</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="perm_payments" ${staffFormData.permissions?.payments?'checked':''}> 수강료</label>
+            <label class="flex items-center gap-2"><input type="checkbox" id="perm_notices" ${staffFormData.permissions?.notices?'checked':''}> 공지사항</label>
+          </div>
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button onclick="closeStaffModal()" class="flex-1 py-2 border rounded-xl">취소</button>
+          <button onclick="saveStaff()" class="flex-1 py-2 bg-indigo-600 text-white rounded-xl">저장</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// 급여 모달
+function renderSalaryModal(){
+  const s = staff.find(x=>x.id===editingStaffId);
+  const sal = salaries.find(x=>x.staff_id===editingStaffId) || {base_amount:0,bonus:0,deduction:0,paid:false};
+  
+  return `<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick="if(event.target===this){modal='';editingStaffId=null;render();}">
+    <div class="bg-white rounded-2xl w-full max-w-md">
+      <div class="p-4 border-b flex justify-between"><span class="font-bold">${s?.name} 급여 수정</span><button onclick="modal='';editingStaffId=null;render()">✕</button></div>
+      <div class="p-4 space-y-3">
+        <div><label class="text-sm text-gray-600">기본급</label><input type="number" id="salBase" value="${sal.base_amount||0}" class="w-full px-4 py-2 border rounded-xl mt-1"></div>
+        <div><label class="text-sm text-gray-600">수당</label><input type="number" id="salBonus" value="${sal.bonus||0}" class="w-full px-4 py-2 border rounded-xl mt-1"></div>
+        <div><label class="text-sm text-gray-600">공제</label><input type="number" id="salDeduct" value="${sal.deduction||0}" class="w-full px-4 py-2 border rounded-xl mt-1"></div>
+        <label class="flex items-center gap-2"><input type="checkbox" id="salPaid" ${sal.paid?'checked':''}> 지급완료</label>
+        <div class="flex gap-2 pt-2">
+          <button onclick="modal='';editingStaffId=null;render()" class="flex-1 py-2 border rounded-xl">취소</button>
+          <button onclick="saveSalary()" class="flex-1 py-2 bg-indigo-600 text-white rounded-xl">저장</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
 }
 
 // 리포트 모달
@@ -1396,6 +1630,174 @@ async function toggleAttWithPoints(id) {
   }
   await loadData();
   render();
+}
+
+// ========== Business 기능 ==========
+
+// 직원 모달 열기
+function openStaffModal(){
+  editingStaffId = null;
+  staffFormData = {name:'',email:'',password:'',role:'staff',permissions:{}};
+  modal = 'staff';
+  render();
+}
+
+function closeStaffModal(){
+  modal = '';
+  editingStaffId = null;
+  staffFormData = {name:'',email:'',password:'',role:'staff',permissions:{}};
+  render();
+}
+
+function editStaff(id){
+  editingStaffId = id;
+  modal = 'staff';
+  render();
+}
+
+// 직원 저장
+async function saveStaff(){
+  const name = document.getElementById('staffName').value.trim();
+  const email = document.getElementById('staffEmail').value.trim();
+  const password = document.getElementById('staffPw').value;
+  const role = document.getElementById('staffRole').value;
+  const permissions = {
+    students: document.getElementById('perm_students').checked,
+    attendance: document.getElementById('perm_attendance').checked,
+    payments: document.getElementById('perm_payments').checked,
+    notices: document.getElementById('perm_notices').checked
+  };
+  
+  if(!name || !email){alert('이름과 이메일을 입력하세요');return;}
+  if(!editingStaffId && !password){alert('비밀번호를 입력하세요');return;}
+  
+  if(editingStaffId){
+    const updateData = {name, email, role, permissions};
+    if(password) updateData.password = password;
+    await db.from('staff').update(updateData).eq('id', editingStaffId);
+  } else {
+    await db.from('staff').insert({
+      academy_id: academy.id,
+      name, email, password, role, permissions
+    });
+  }
+  
+  closeStaffModal();
+  await loadData();
+  render();
+}
+
+// 직원 삭제
+async function deleteStaff(id){
+  if(!confirm('이 직원을 삭제하시겠습니까?')) return;
+  await db.from('staff').delete().eq('id', id);
+  await loadData();
+  render();
+}
+
+// 직원 출근
+async function staffCheckIn(staffId){
+  const now = new Date().toTimeString().slice(0,5);
+  await db.from('staff_attendance').insert({
+    staff_id: staffId,
+    date: todayISO,
+    check_in: now,
+    status: '출근'
+  });
+  await loadData();
+  render();
+}
+
+// 직원 퇴근
+async function staffCheckOut(staffId){
+  const now = new Date().toTimeString().slice(0,5);
+  const att = staffAttendance.find(a => a.staff_id === staffId);
+  if(att){
+    await db.from('staff_attendance').update({check_out: now}).eq('id', att.id);
+  }
+  await loadData();
+  render();
+}
+
+// 급여 수정 모달
+function editSalary(staffId){
+  editingStaffId = staffId;
+  modal = 'salary';
+  render();
+}
+
+// 급여 저장
+async function saveSalary(){
+  const base = parseInt(document.getElementById('salBase').value) || 0;
+  const bonus = parseInt(document.getElementById('salBonus').value) || 0;
+  const deduction = parseInt(document.getElementById('salDeduct').value) || 0;
+  const paid = document.getElementById('salPaid').checked;
+  const currentMonth = new Date().toISOString().slice(0,7);
+  
+  const existing = salaries.find(s => s.staff_id === editingStaffId);
+  
+  if(existing){
+    await db.from('salaries').update({
+      base_amount: base,
+      bonus,
+      deduction,
+      paid,
+      paid_date: paid ? todayISO : null
+    }).eq('id', existing.id);
+  } else {
+    await db.from('salaries').insert({
+      staff_id: editingStaffId,
+      month: currentMonth,
+      base_amount: base,
+      bonus,
+      deduction,
+      paid,
+      paid_date: paid ? todayISO : null
+    });
+  }
+  
+  modal = '';
+  editingStaffId = null;
+  await loadData();
+  render();
+}
+
+// 지점 추가 모달
+function openBranchModal(){
+  const name = prompt('지점명을 입력하세요:');
+  if(!name) return;
+  addBranch(name);
+}
+
+// 지점 추가
+async function addBranch(branchName){
+  await db.from('academies').insert({
+    name: branchName,
+    branch_name: branchName,
+    parent_id: academy.id,
+    owner: academy.owner
+  });
+  await loadData();
+  render();
+}
+
+// 지점 삭제
+async function deleteBranch(id){
+  if(!confirm('이 지점을 삭제하시겠습니까?')) return;
+  await db.from('academies').delete().eq('id', id);
+  await loadData();
+  render();
+}
+
+// 지점 전환
+async function switchBranch(id){
+  const branch = branches.find(b => b.id === id);
+  if(branch){
+    academy = branch;
+    await loadData();
+    render();
+    alert(`${branch.branch_name || branch.name} 지점으로 전환되었습니다.`);
+  }
 }
 
 render();
